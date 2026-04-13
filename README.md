@@ -1,2 +1,2 @@
 # V-LINK
-Proyecto para Curso Integrado II _ V-LINK
+Proyecto para Curso Integrador II _ V-LINK
