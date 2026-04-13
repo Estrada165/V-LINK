@@ -1,95 +1,70 @@
-Proyecto para Curso Integrado II, V-LINK.
+# Getting Started with Create React App
 
-### 1. Clonar el repositorio
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-Para clonar el repositorio en tu máquina local, usa el siguiente comando en tu terminal:
+## Available Scripts
 
-```bash
-git clone https://github.com/Estrada165/V-LINK.git
-````
+In the project directory, you can run:
 
-Esto descargará el proyecto en tu computadora y podrás empezar a trabajar con los archivos localmente.
+### `npm start`
 
-### 2. Abrir el proyecto en Visual Studio Code
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-* Después de clonar el repositorio, abre **Visual Studio Code**.
-* Haz clic en **File** (Archivo) y luego en **Open Folder** (Abrir Carpeta).
-* Selecciona la carpeta `V-LINK` (o el nombre de tu repositorio) y ábrela.
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
 
-Esto te permitirá trabajar en los archivos del proyecto desde Visual Studio Code.
+### `npm test`
 
-### 3. Sincronización antes de trabajar
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-Antes de empezar a trabajar, asegúrate de tener la versión más reciente del proyecto. Para ello, debes ejecutar el siguiente comando en la terminal dentro de Visual Studio Code:
+### `npm run build`
 
-```bash
-git pull origin main
-```
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
-Este comando descarga los cambios más recientes del repositorio y asegura que tu copia local esté actualizada. **Haz esto siempre antes de empezar a trabajar** para evitar conflictos y trabajar sobre la versión más actual.
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-### 4. Realizar cambios
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-Cuando hayas terminado de realizar los cambios necesarios en los archivos del proyecto, sigue estos pasos para registrar y subir esos cambios a GitHub.
+### `npm run eject`
 
-#### 4.1. Agregar los archivos modificados
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
-Para agregar todos los archivos modificados a la lista de cambios que quieres registrar, usa el siguiente comando:
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-```bash
-git add .
-```
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-Este comando agrega todos los archivos modificados. Si solo deseas agregar archivos específicos, puedes reemplazar el `.` con el nombre del archivo.
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
-#### 4.2. Hacer un commit de los cambios
+## Learn More
 
-Después de agregar los archivos, debes registrar los cambios que has hecho con un mensaje descriptivo:
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-```bash
-git commit -m "Descripción de los cambios realizados"
-```
+To learn React, check out the [React documentation](https://reactjs.org/).
 
-Asegúrate de que el mensaje del commit describa claramente los cambios que hiciste, por ejemplo: "Añadir nueva funcionalidad al frontend" o "Corregir error en la base de datos".
+### Code Splitting
 
-#### 4.3. Subir los cambios a GitHub
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
 
-Finalmente, después de hacer el commit, sube tus cambios a GitHub para que todos los miembros del equipo puedan verlos y trabajar con la última versión:
+### Analyzing the Bundle Size
 
-```bash
-git push origin main
-```
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-Este comando sube tus cambios al repositorio en GitHub.
+### Making a Progressive Web App
 
-### 5. Sincronización con los cambios de los demás
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
-Si otro miembro del equipo ha hecho cambios mientras trabajabas, es importante sincronizar tu repositorio local con los cambios más recientes antes de continuar trabajando.
+### Advanced Configuration
 
-Para hacerlo, usa el siguiente comando:
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-```bash
-git pull origin main
-```
+### Deployment
 
-Este comando traerá los cambios más recientes del repositorio de GitHub a tu copia local y los fusionará con tu trabajo actual.
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
----
+### `npm run build` fails to minify
 
-### Resumen de los comandos
-
-* **`git clone <enlace>`**: Clona el repositorio en tu máquina local.
-* **`git pull origin main`**: Obtiene los cambios más recientes del repositorio de GitHub.
-* **`git add .`**: Agrega todos los archivos modificados para ser registrados.
-* **`git commit -m "mensaje"`**: Registra los cambios con un mensaje descriptivo.
-* **`git push origin main`**: Sube tus cambios al repositorio de GitHub.
-
----
-
-### Notas importantes
-
-* Siempre haz **`git pull origin main`** antes de empezar a trabajar para asegurarte de que tienes la última versión del proyecto.
-* Realiza **`git commit`** y **`git push`** frecuentemente para evitar perder cambios y mantener el repositorio actualizado.
-* Si hay conflictos al hacer **`git pull`**, Git te pedirá que los resuelvas. Esto sucede cuando dos personas modifican las mismas líneas de un archivo.
-
-```
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)

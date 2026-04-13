@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@300;400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --mg-black: #0a0a0a;
+  --mg-dark: #111111;
+  --mg-card: #161616;
+  --mg-border: #1f1f1f;
+  --mg-muted: #2a2a2a;
+  --mg-gray: #6b6b6b;
+  --mg-light: #a0a0a0;
+  --mg-white: #f0f0f0;
+  --mg-red: #e03030;
+  --mg-green: #1db954;
+  --mg-cyan: #00c8c8;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--mg-black);
+  color: var(--mg-white);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--mg-dark); }
+::-webkit-scrollbar-thumb { background: var(--mg-muted); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mg-gray); }
+
+/* Leaflet map dark override */
+.leaflet-container {
+  background: #0d0d0d !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+.leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) saturate(0.8) !important;
+}
+.leaflet-control-zoom a {
+  background: #161616 !important;
+  color: #f0f0f0 !important;
+  border-color: #1f1f1f !important;
+}
+
+/* Animations */
+@keyframes rotate-ring {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes counter-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+@keyframes ping-slow {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes scan-line {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+.ring-outer { animation: rotate-ring 12s linear infinite; }
+.ring-inner { animation: counter-rotate 8s linear infinite; }
+.ping-anim { animation: ping-slow 2s ease-out infinite; }
+.scan-anim { animation: scan-line 3s linear infinite; }
+
+/* Nav active */
+.nav-item-active {
+  color: var(--mg-white) !important;
+  border-top: 1px solid var(--mg-red);
+}
+
+/* Glass card */
+.glass {
+  background: rgba(22, 22, 22, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Number counter font */
+.font-counter {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
