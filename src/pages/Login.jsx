@@ -1,160 +1,188 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
+const QUICK = [
+  { label: 'Admin',   username: 'admin',   password: '12345',  role: 'admin', color: '#e03030' },
+  { label: 'Usuario', username: 'usuario', password: '123456', role: 'user',  color: '#00d4d4' },
+];
 
 export default function Login() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
+  const handleLogin = (u = username, p = password) => {
     setLoading(true);
-    setTimeout(() => navigate('/dashboard'), 1200);
+    setError('');
+    setTimeout(() => {
+      const result = login(u, p);
+      if (result.ok) {
+        navigate(result.role === 'admin' ? '/dashboard' : '/dashboard');
+      } else {
+        setError(result.error);
+        setLoading(false);
+      }
+    }, 800);
+  };
+
+  const fillQuick = (q) => {
+    setUsername(q.username);
+    setPassword(q.password);
+    setError('');
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ background: '#0a0a0a' }}
-    >
-      {/* Background grid */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `
-            linear-gradient(rgba(224,48,48,0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(224,48,48,0.03) 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px',
-        }}
-      />
-
+    <div style={{
+      minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg-base)', position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Grid bg */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        backgroundImage: `linear-gradient(var(--border) 1px, transparent 1px),
+                          linear-gradient(90deg, var(--border) 1px, transparent 1px)`,
+        backgroundSize: '48px 48px', opacity: 0.4,
+      }}/>
       {/* Top glow */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none"
-        style={{
-          width: 600,
-          height: 300,
-          background: 'radial-gradient(ellipse at center, rgba(224,48,48,0.08) 0%, transparent 70%)',
-        }}
-      />
+      <div style={{
+        position: 'absolute', top: -100, left: '50%', transform: 'translateX(-50%)',
+        width: 500, height: 300, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%)',
+      }}/>
 
-      <div className="relative z-10 w-full max-w-sm px-6 flex flex-col items-center gap-8">
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 360, padding: '0 24px' }} className="anim-fade">
+
         {/* Logo */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="relative">
-            <svg viewBox="0 0 80 80" width="80" height="80">
-              <polygon points="40,4 74,22 74,58 40,76 6,58 6,22" fill="rgba(224,48,48,0.08)" stroke="#e03030" strokeWidth="1" />
-              <polygon points="40,14 64,27 64,53 40,66 16,53 16,27" fill="none" stroke="#e03030" strokeWidth="0.5" strokeOpacity="0.4" />
-              {/* Motorcycle */}
-              <ellipse cx="26" cy="52" rx="8" ry="8" stroke="#e03030" strokeWidth="1.5" fill="none" />
-              <ellipse cx="54" cy="52" rx="8" ry="8" stroke="#e03030" strokeWidth="1.5" fill="none" />
-              <path d="M34 52 L42 36 L52 36 L54 44" stroke="#e03030" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-              <path d="M34 52 L38 52 L42 36" stroke="#e03030" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-              <path d="M38 52 L46 52" stroke="#e03030" strokeWidth="1" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="flex flex-col items-center">
-            <h1
-              style={{
-                fontFamily: 'Bebas Neue, sans-serif',
-                fontSize: '36px',
-                letterSpacing: '0.25em',
-                color: '#f0f0f0',
-                lineHeight: 1,
-              }}
-            >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+          <svg viewBox="0 0 64 64" width="64" height="64">
+            <polygon points="32,4 60,18 60,46 32,60 4,46 4,18"
+              fill="var(--accent-soft)" stroke="var(--accent)" strokeWidth="1.5"/>
+            <polygon points="32,12 52,22 52,42 32,52 12,42 12,22"
+              fill="none" stroke="var(--accent)" strokeWidth="0.5" opacity="0.4"/>
+            {/* moto */}
+            <circle cx="20" cy="42" r="7" fill="none" stroke="var(--accent)" strokeWidth="1.5"/>
+            <circle cx="44" cy="42" r="7" fill="none" stroke="var(--accent)" strokeWidth="1.5"/>
+            <path d="M27 42 L32 28 L40 28 L44 36" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M27 42 L30 42 L32 28" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M30 42 L38 42" stroke="var(--accent)" strokeWidth="1" strokeLinecap="round"/>
+          </svg>
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontFamily: 'Bebas Neue', fontSize: 38, letterSpacing: '0.25em', color: 'var(--text-primary)', lineHeight: 1 }}>
               MOTOGUARD
             </h1>
-            <span
-              style={{
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: '10px',
-                color: '#6b6b6b',
-                letterSpacing: '0.2em',
-              }}
-            >
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.18em', marginTop: 4 }}>
               SISTEMA DE SEGURIDAD VEHICULAR
-            </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Quick access pills */}
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.14em', marginBottom: 8, textAlign: 'center' }}>
+            ACCESO RÁPIDO — DEMO
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {QUICK.map(q => (
+              <button key={q.label} onClick={() => fillQuick(q)} style={{
+                flex: 1, padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
+                background: 'var(--bg-card)', border: `1px solid var(--border)`,
+                transition: 'all .2s',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = q.color + '60'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              >
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: q.color, letterSpacing: '0.1em' }}>
+                  {q.label.toUpperCase()}
+                </span>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)' }}>
+                  {q.username} / {q.password}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="w-full flex flex-col gap-3">
-          <div>
-            <label
-              style={{ fontFamily: 'JetBrains Mono', fontSize: '9px', color: '#6b6b6b', letterSpacing: '0.15em', display: 'block', marginBottom: 6 }}
-            >
-              CORREO ELECTRÓNICO
-            </label>
+        <div className="mg-card" style={{ padding: '24px' }}>
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 6 }}>
+              USUARIO
+            </p>
             <input
-              type="email"
-              defaultValue="admin@motoguard.io"
-              className="w-full rounded-lg px-4 py-3 outline-none transition-all duration-200"
+              value={username} onChange={e => setUsername(e.target.value)}
+              placeholder="admin · usuario"
               style={{
-                background: '#161616',
-                border: '1px solid #1f1f1f',
-                color: '#f0f0f0',
-                fontSize: '14px',
-                fontFamily: 'DM Sans, sans-serif',
+                width: '100%', padding: '11px 14px',
+                background: 'var(--bg-input)', border: '1px solid var(--border)',
+                borderRadius: 9, color: 'var(--text-primary)',
+                fontFamily: 'JetBrains Mono', fontSize: 13, outline: 'none', transition: 'border .2s',
               }}
-              onFocus={e => e.target.style.borderColor = '#e0303060'}
-              onBlur={e => e.target.style.borderColor = '#1f1f1f'}
+              onFocus={e => e.target.style.borderColor = 'var(--accent-border)'}
+              onBlur={e => e.target.style.borderColor = 'var(--border)'}
             />
           </div>
-          <div>
-            <label
-              style={{ fontFamily: 'JetBrains Mono', fontSize: '9px', color: '#6b6b6b', letterSpacing: '0.15em', display: 'block', marginBottom: 6 }}
-            >
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 6 }}>
               CONTRASEÑA
-            </label>
+            </p>
             <input
-              type="password"
-              defaultValue="••••••••"
-              className="w-full rounded-lg px-4 py-3 outline-none"
+              type="password" value={password} onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              placeholder="••••••"
               style={{
-                background: '#161616',
-                border: '1px solid #1f1f1f',
-                color: '#f0f0f0',
-                fontSize: '14px',
-                fontFamily: 'DM Sans, sans-serif',
+                width: '100%', padding: '11px 14px',
+                background: 'var(--bg-input)', border: '1px solid var(--border)',
+                borderRadius: 9, color: 'var(--text-primary)',
+                fontFamily: 'JetBrains Mono', fontSize: 13, outline: 'none', transition: 'border .2s',
               }}
-              onFocus={e => e.target.style.borderColor = '#e0303060'}
-              onBlur={e => e.target.style.borderColor = '#1f1f1f'}
+              onFocus={e => e.target.style.borderColor = 'var(--accent-border)'}
+              onBlur={e => e.target.style.borderColor = 'var(--border)'}
             />
           </div>
+
+          {error && (
+            <div style={{
+              padding: '8px 12px', borderRadius: 8, marginBottom: 14,
+              background: 'var(--accent-soft)', border: '1px solid var(--accent-border)',
+            }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--accent)' }}>{error}</span>
+            </div>
+          )}
 
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg py-4 mt-2 transition-all duration-300 flex items-center justify-center gap-2"
+            onClick={() => handleLogin()}
+            disabled={loading || !username || !password}
             style={{
-              background: loading ? '#2a0a0a' : '#e03030',
-              color: '#fff',
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: '12px',
-              letterSpacing: '0.15em',
-              border: 'none',
-              cursor: loading ? 'wait' : 'pointer',
-              boxShadow: loading ? 'none' : '0 0 24px rgba(224,48,48,0.3)',
+              width: '100%', padding: '13px',
+              background: loading || (!username || !password) ? 'var(--bg-surface)' : 'var(--accent)',
+              border: `1px solid ${loading ? 'var(--border)' : !username || !password ? 'var(--border)' : '#ff5040'}`,
+              borderRadius: 10, cursor: loading || !username || !password ? 'not-allowed' : 'pointer',
+              fontFamily: 'JetBrains Mono', fontSize: 12, letterSpacing: '0.15em',
+              color: loading || !username || !password ? 'var(--text-muted)' : '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              transition: 'all .25s',
+              boxShadow: !loading && username && password ? '0 0 20px var(--accent-glow)' : 'none',
             }}
           >
-            {loading ? (
-              <>
-                <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </svg>
-                VERIFICANDO...
-              </>
-            ) : 'INICIAR SESIÓN'}
+            {loading
+              ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center' }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>VERIFICANDO...</>
+              : 'INICIAR SESIÓN'
+            }
           </button>
-        </form>
-
-        {/* Footer */}
-        <div className="flex flex-col items-center gap-1">
-          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '9px', color: '#2a2a2a', letterSpacing: '0.1em' }}>
-            MOTOGUARD v2.4.1 · SISTEMA CIFRADO AES-256
-          </span>
         </div>
+
+        <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', textAlign: 'center', marginTop: 16, letterSpacing: '0.1em' }}>
+          MOTOGUARD v2.4.1 · AES-256 · Piura, Perú
+        </p>
       </div>
     </div>
   );
