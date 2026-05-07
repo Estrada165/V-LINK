@@ -1,70 +1,121 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ThemeToggle from '../components/ui/ThemeToggle';
-import { mockTelemetry, mockUsers, mockAlerts, mockRoutes } from '../mocks/mockData';
+import { adminService, alertService, routeService } from '../services/api';
+import api from '../services/api';
 
-/* ── atoms ───────────────────────────────────────────────── */
-const Card = ({ children, style = {}, onClick }) => (
-  <div className={`mg-card${onClick ? ' mg-card-hover' : ''}`}
-    onClick={onClick}
-    style={{ padding: '16px 18px', ...style, cursor: onClick ? 'pointer' : 'default' }}>
-    {children}
-  </div>
+const Card = ({ children, style = {} }) => (
+  <div className="mg-card" style={{ padding: '16px 18px', ...style }}>{children}</div>
 );
 const Label = ({ children, action, onAction }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
     <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-muted)' }}>{children}</span>
-    {action && <button onClick={onAction} style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.1em' }}>{action}</button>}
+    {action && <button onClick={onAction} style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>{action}</button>}
   </div>
 );
 const Dot = ({ color = 'var(--green)', pulse = false, size = 7 }) => (
   <div className={pulse ? 'anim-blink' : ''} style={{ width: size, height: size, borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}`, flexShrink: 0 }} />
 );
-const Stat = ({ label, value, sub, color = 'var(--text-primary)', accent }) => (
-  <Card>
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
-      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>{label}</span>
-      {accent && <div style={{ width: 2, height: 18, background: color, borderRadius: 1, opacity: .5 }} />}
-    </div>
-    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 22, fontWeight: 300, color, letterSpacing: '-0.02em' }}>{value}</span>
-    {sub && <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', marginTop: 3, letterSpacing: '0.08em' }}>{sub}</p>}
-  </Card>
+const Empty = ({ msg }) => (
+  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-faint)', textAlign: 'center', padding: '20px 0' }}>{msg}</p>
 );
-const Sparkline = ({ data = [] }) => {
-  const vals = data.map(d => d.value);
-  const max = Math.max(...vals) || 1, min = Math.min(...vals) || 0;
-  const W = 200, H = 34;
-  const pts = data.map((d, i) => `${(i / (data.length - 1)) * W},${H - ((d.value - min) / (max - min || 1)) * H}`).join(' ');
+
+// Modal para resetear contraseña
+function ResetPasswordModal({ user, onClose, onSave }) {
+  const [pwd, setPwd] = useState('');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handle = async () => {
+    if (pwd.length < 8) { setErr('Mínimo 8 caracteres'); return; }
+    setLoading(true);
+    try {
+      await adminService.resetPassword(user.id_usuario, pwd);
+      onSave();
+    } catch (e) { setErr(e.error || 'Error'); }
+    setLoading(false);
+  };
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
-      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".75" />
-    </svg>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="mg-card" style={{ width: '100%', maxWidth: 360, padding: 24 }}>
+        <h3 style={{ fontFamily: 'Bebas Neue', fontSize: 22, color: 'var(--text-primary)', marginBottom: 6 }}>RESETEAR CONTRASEÑA</h3>
+        <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', marginBottom: 16 }}>{user.nombre_completo}</p>
+        {err && <div style={{ padding: '8px 12px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 8, marginBottom: 12 }}>
+          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--accent)' }}>{err}</span>
+        </div>}
+        <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="Nueva contraseña (mín. 8 chars)"
+          style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)', fontFamily: 'DM Sans', fontSize: 13, outline: 'none', marginBottom: 12 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '10px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>CANCELAR</button>
+          <button onClick={handle} disabled={loading} style={{ flex: 2, padding: '10px', background: 'var(--accent)', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, color: '#fff', letterSpacing: '0.1em' }}>
+            {loading ? 'GUARDANDO...' : 'RESETEAR'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
-};
-
-/* ── system health bar ───────────────────────────────────── */
-const HealthBar = ({ label, value, color }) => (
-  <div style={{ marginBottom: 12 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color }}>{value}%</span>
-    </div>
-    <div style={{ height: 3, background: 'var(--border)', borderRadius: 2 }}>
-      <div style={{ height: '100%', width: `${value}%`, background: color, borderRadius: 2, boxShadow: `0 0 5px ${color}`, transition: 'width .7s' }} />
-    </div>
-  </div>
-);
-
-/* ── all users table ─────────────────────────────────────── */
-const ALL_USERS = [
-  { id: 1, name: 'Carlos Mendoza', device: 'Kawasaki Z900',   plate: 'ABC-123', status: 'online',  alerts: 2, battery: 87 },
-  { id: 2, name: 'Elena Ríos',     device: 'Honda CB500',     plate: 'XYZ-456', status: 'online',  alerts: 0, battery: 62 },
-  { id: 3, name: 'Javier Soler',   device: 'Yamaha MT-07',    plate: 'DEF-789', status: 'offline', alerts: 1, battery: 34 },
-  { id: 4, name: 'Ana Torres',     device: 'Kawasaki Ninja',  plate: 'GHI-012', status: 'online',  alerts: 0, battery: 91 },
-  { id: 5, name: 'Luis Vargas',    device: 'Honda CRF',       plate: 'JKL-345', status: 'offline', alerts: 3, battery: 15 },
-];
+}
 
 export default function DashboardAdmin() {
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [users,   setUsers]   = useState([]);
+  const [alerts,  setAlerts]  = useState([]);
+  const [routes,  setRoutes]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [resetUser, setResetUser] = useState(null);
+  const [actionMsg, setActionMsg] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [u, a, r] = await Promise.all([
+        adminService.getAllUsers(),
+        alertService.getAll(),
+        routeService.getAll(),
+      ]);
+      setUsers(u);
+      setAlerts(a.slice(0, 5));
+      setRoutes(r.slice(0, 4));
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const toggleActive = async (user) => {
+    try {
+      await api.patch(`/admin/users/${user.id_usuario}/toggle-active`, { activo: !user.activo });
+      setActionMsg(`${user.nombre_completo} ${!user.activo ? 'activado' : 'desactivado'}`);
+      setTimeout(() => setActionMsg(''), 3000);
+      await load();
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteUser = async (user) => {
+    if (!window.confirm(`¿Eliminar a ${user.nombre_completo}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await adminService.deleteUser(user.id_usuario);
+      await load();
+    } catch (e) { console.error(e); }
+  };
+
+  const pending  = users.filter(u => !u.activo && u.rol !== 'admin');
+  const active   = users.filter(u => u.activo);
+  const inactive = users.filter(u => !u.activo);
+
+  // Stats reales
+  const pendingAlerts = alerts.filter(a => a.estado_alerta === 'pendiente').length;
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+      <div style={{ textAlign: 'center' }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"
+          style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center', display: 'block', margin: '0 auto 12px' }}>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.12em' }}>CARGANDO...</span>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ padding: '24px 28px' }} className="anim-fade">
@@ -73,224 +124,225 @@ export default function DashboardAdmin() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={{
-              fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.14em',
-              color: 'var(--accent)', background: 'var(--accent-soft)',
-              border: '1px solid var(--accent-border)', padding: '3px 8px', borderRadius: 4,
-            }}>ADMIN</span>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.14em', color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '3px 8px', borderRadius: 4 }}>
+              ADMINISTRADOR
+            </span>
+            {pending.length > 0 && (
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.1em', color: 'var(--amber)', background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', padding: '3px 8px', borderRadius: 4 }}>
+                {pending.length} PENDIENTE{pending.length > 1 ? 'S' : ''} DE ACTIVAR
+              </span>
+            )}
           </div>
-          <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>
-            PANEL DE CONTROL
-          </h1>
+          <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>PANEL DE CONTROL</h1>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>
-            Telemetría global · gestión del sistema
+            {users.length} usuarios · {active.length} activos · {alerts.length} alertas
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--green-soft)', border: '1px solid var(--green-border)', borderRadius: 8 }}>
-            <Dot pulse />
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--green)', letterSpacing: '0.1em' }}>SISTEMA OPERATIVO</span>
-          </div>
+          {actionMsg && (
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--green)', background: 'var(--green-soft)', border: '1px solid var(--green-border)', padding: '6px 12px', borderRadius: 8 }}>
+              {actionMsg}
+            </span>
+          )}
           <ThemeToggle compact />
         </div>
       </div>
 
-      {/* Global stats */}
+      {/* Stats reales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <Stat label="LATENCIA"      value={mockTelemetry.latency}          sub="PRIMERA RESP."     color="var(--cyan)"   accent />
-        <Stat label="DISPOSITIVOS"  value={mockTelemetry.activeDevices.toLocaleString()} sub="ACTIVOS GLOBAL" accent />
-        <Stat label="SLA UPTIME"    value={mockTelemetry.slaPerformance}   sub="EN CUMPLIMIENTO"   color="var(--green)"  accent />
-        <Stat label="SESIONES"      value={mockTelemetry.activeSessions}   sub="EN ESTE MOMENTO"   color="var(--amber)"  accent />
-        <Stat label="ALERTAS HOY"   value="6"                               sub="4 PENDIENTES"      color="var(--accent)" accent />
-        <Stat label="INCIDENCIAS"   value="9"                               sub="REPORTADAS HOY"    accent />
+        {[
+          { label: 'USUARIOS TOTAL',   value: users.length,         color: 'var(--text-primary)' },
+          { label: 'ACTIVOS',          value: active.length,        color: 'var(--green)' },
+          { label: 'PENDIENTES',       value: pending.length,       color: pending.length > 0 ? 'var(--amber)' : 'var(--text-muted)' },
+          { label: 'ALERTAS ACTIVAS',  value: pendingAlerts,        color: pendingAlerts > 0 ? 'var(--accent)' : 'var(--green)' },
+          { label: 'RUTAS REGISTRADAS',value: routes.length,        color: 'var(--cyan)' },
+          { label: 'INCIDENCIAS HOY',  value: alerts.length,        color: 'var(--text-primary)' },
+        ].map(s => (
+          <Card key={s.label} style={{ padding: '14px 16px' }}>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{s.label}</span>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 24, fontWeight: 300, color: s.color }}>{s.value}</span>
+          </Card>
+        ))}
       </div>
 
-      {/* Main 3-col */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
+      {/* Main grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
 
-        {/* LEFT: system health + chart */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
+        {/* GESTIÓN DE USUARIOS */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, gridColumn: 'span 2' }}>
           <Card>
-            <Label>SALUD DEL SISTEMA</Label>
-            <HealthBar label="CPU Railway"      value={38} color="var(--green)" />
-            <HealthBar label="Memoria RAM"      value={61} color="var(--cyan)" />
-            <HealthBar label="BD Supabase"      value={22} color="var(--green)" />
-            <HealthBar label="Ancho de banda"   value={74} color="var(--amber)" />
-            <HealthBar label="Almacenamiento"   value={45} color="var(--green)" />
-            <div style={{ marginTop: 10, padding: '8px 10px', background: 'var(--green-soft)', border: '1px solid var(--green-border)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Dot color="var(--green)" pulse />
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--green)', letterSpacing: '0.1em' }}>SYSTEM HEALTHY</span>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginLeft: 'auto' }}>UPTIME {mockTelemetry.uptime}</span>
-            </div>
-          </Card>
+            <Label>GESTIÓN DE USUARIOS</Label>
 
-          <Card>
-            <Label>TELEMETRÍA 24H</Label>
-            <Sparkline data={mockTelemetry.chartData} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)' }}>00:00</span>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)' }}>24:00</span>
-            </div>
-          </Card>
-
-          {/* Bottom metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {[
-              { label: 'SLA',      value: mockTelemetry.slaPerformance, color: 'var(--green)' },
-              { label: 'DATA',     value: mockTelemetry.dataTransfer,   color: 'var(--cyan)' },
-              { label: 'UPTIME',   value: mockTelemetry.uptime,         color: 'var(--amber)' },
-              { label: 'ERRORES',  value: '0',                          color: 'var(--green)' },
-            ].map(s => (
-              <Card key={s.label} style={{ padding: '12px 14px' }}>
-                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>{s.label}</span>
-                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 300, color: s.color, marginTop: 4 }}>{s.value}</p>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* CENTER: all users */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card>
-            <Label action="+ NUEVO USUARIO">GESTIÓN DE USUARIOS</Label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {/* Table header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 50px 40px', gap: 8, paddingBottom: 8, borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
-                {['USUARIO', 'ESTADO', 'ALERTAS', 'BAT.'].map(h => (
-                  <span key={h} style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>{h}</span>
+            {/* Pendientes de activar — destacados */}
+            {pending.length > 0 && (
+              <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', borderRadius: 10 }}>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--amber)', letterSpacing: '0.12em', marginBottom: 10 }}>
+                  CUENTAS PENDIENTES DE ACTIVACIÓN
+                </p>
+                {pending.map(u => (
+                  <div key={u.id_usuario} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--amber-border)' }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: 'var(--amber)' }}>{u.nombre_completo[0]}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.nombre_completo}</p>
+                      <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>{u.correo_electronico}</p>
+                    </div>
+                    <button onClick={() => toggleActive(u)} style={{
+                      padding: '7px 14px', background: 'var(--green)', border: 'none', borderRadius: 7,
+                      cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, color: '#fff', letterSpacing: '0.08em', flexShrink: 0,
+                    }}>
+                      ACTIVAR
+                    </button>
+                  </div>
                 ))}
               </div>
-              {ALL_USERS.map((u, i) => (
-                <button key={u.id} onClick={() => setSelectedUser(selectedUser?.id === u.id ? null : u)}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '1fr 70px 50px 40px',
-                    gap: 8, alignItems: 'center', padding: '10px 0',
-                    borderBottom: i < ALL_USERS.length - 1 ? '1px solid var(--border)' : 'none',
-                    background: selectedUser?.id === u.id ? 'var(--accent-soft)' : 'none',
-                    border: 'none', cursor: 'pointer', transition: 'background .2s',
-                    borderRadius: selectedUser?.id === u.id ? 8 : 0,
-                    textAlign: 'left',
-                  }}>
-                  <div>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</p>
-                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.device}</p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <Dot color={u.status === 'online' ? 'var(--green)' : 'var(--text-muted)'} pulse={u.status === 'online'} size={5} />
-                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: u.status === 'online' ? 'var(--green)' : 'var(--text-muted)' }}>
-                      {u.status === 'online' ? 'ONLINE' : 'OFFLINE'}
-                    </span>
-                  </div>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: u.alerts > 0 ? 'var(--accent)' : 'var(--text-muted)', textAlign: 'center' }}>{u.alerts}</span>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: u.battery < 30 ? 'var(--accent)' : 'var(--text-secondary)' }}>{u.battery}%</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Selected user detail */}
-            {selectedUser && (
-              <div style={{ marginTop: 14, padding: '14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10 }}>
-                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 10 }}>DETALLE · {selectedUser.name.toUpperCase()}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {[
-                    ['Vehículo', selectedUser.device],
-                    ['Placa',    selectedUser.plate],
-                    ['Batería',  `${selectedUser.battery}%`],
-                    ['Alertas',  selectedUser.alerts],
-                  ].map(([k, v]) => (
-                    <div key={k} style={{ padding: '8px 10px', background: 'var(--bg-card)', borderRadius: 7, border: '1px solid var(--border)' }}>
-                      <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 2 }}>{k.toUpperCase()}</p>
-                      <p style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: 'var(--text-secondary)' }}>{v}</p>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button style={{ flex: 1, padding: '8px', borderRadius: 7, cursor: 'pointer', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', color: 'var(--accent)', fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.08em' }}>
-                    VER EN MAPA
-                  </button>
-                  <button style={{ flex: 1, padding: '8px', borderRadius: 7, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.08em' }}>
-                    EDITAR USUARIO
-                  </button>
-                </div>
-              </div>
             )}
-          </Card>
-        </div>
 
-        {/* RIGHT: alerts + routes */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          <Card>
-            <Label action="VER TODO →">ALERTAS GLOBALES</Label>
-            {[
-              { user: 'Carlos M.', type: 'Robo reportado',       time: '14:26', sev: 'high' },
-              { user: 'Javier S.', type: 'Movimiento detectado', time: '13:48', sev: 'high' },
-              { user: 'Luis V.',   type: 'Batería crítica',      time: '12:15', sev: 'medium' },
-              { user: 'Carlos M.', type: 'Zona de riesgo',       time: '11:05', sev: 'low' },
-            ].map((a, i, arr) => {
-              const c = a.sev === 'high' ? 'var(--accent)' : a.sev === 'medium' ? 'var(--amber)' : 'var(--green)';
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <Dot color={c} pulse={a.sev === 'high'} size={6} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>{a.type}</span>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>{a.time}</span>
-                    </div>
-                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>{a.user}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </Card>
-
-          <Card>
-            <Label>RUTAS RECIENTES — TODOS</Label>
-            {mockRoutes.map((r, i) => (
-              <div key={r.id} style={{ padding: '9px 0', borderBottom: i < mockRoutes.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>{r.date}</span>
-                  <span style={{
-                    fontFamily: 'JetBrains Mono', fontSize: 8,
-                    color: r.status === 'COMPLETADO' ? 'var(--green)' : 'var(--accent)',
-                    background: r.status === 'COMPLETADO' ? 'var(--green-soft)' : 'var(--accent-soft)',
-                    border: `1px solid ${r.status === 'COMPLETADO' ? 'var(--green-border)' : 'var(--accent-border)'}`,
-                    padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap',
-                  }}>{r.status}</span>
-                </div>
-                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 300, color: 'var(--text-primary)' }}>{r.distance}</span>
-                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginLeft: 8 }}>{r.duration}</span>
-              </div>
-            ))}
-          </Card>
-
-          {/* Quick actions admin */}
-          <Card>
-            <Label>ACCIONES RÁPIDAS</Label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                ['Exportar reporte global',  'var(--cyan)'],
-                ['Enviar alerta masiva',     'var(--accent)'],
-                ['Reiniciar servidor',       'var(--amber)'],
-              ].map(([label, color]) => (
-                <button key={label} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                  color, fontFamily: 'DM Sans', fontSize: 12, fontWeight: 500,
-                  transition: 'all .2s',
-                }}>
-                  {label}
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-              ))}
+            {/* Tabla de todos los usuarios */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    {['USUARIO', 'CORREO', 'ROL', 'ESTADO', 'REGISTRO', 'ACCIONES'].map(h => (
+                      <th key={h} style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.1em', padding: '8px 10px', textAlign: 'left', fontWeight: 400 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id_usuario} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: u.rol === 'admin' ? 'var(--accent-soft)' : 'var(--bg-surface)', border: `1px solid ${u.rol === 'admin' ? 'var(--accent-border)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: u.rol === 'admin' ? 'var(--accent)' : 'var(--text-muted)' }}>{u.nombre_completo[0]}</span>
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.nombre_completo}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 10px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>{u.correo_electronico}</span>
+                      </td>
+                      <td style={{ padding: '10px 10px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: u.rol === 'admin' ? 'var(--accent)' : 'var(--cyan)', background: u.rol === 'admin' ? 'var(--accent-soft)' : 'var(--cyan-soft)', border: `1px solid ${u.rol === 'admin' ? 'var(--accent-border)' : 'var(--cyan-border)'}`, padding: '2px 7px', borderRadius: 4 }}>
+                          {u.rol.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Dot color={u.activo ? 'var(--green)' : 'var(--text-muted)'} size={6} />
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: u.activo ? 'var(--green)' : 'var(--text-muted)' }}>
+                            {u.activo ? 'ACTIVO' : 'INACTIVO'}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 10px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>
+                          {u.fecha_registro ? new Date(u.fecha_registro).toLocaleDateString('es-PE') : '—'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 10px' }}>
+                        {u.rol !== 'admin' && (
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                            <button onClick={() => toggleActive(u)} style={{
+                              padding: '5px 10px', borderRadius: 6, cursor: 'pointer', border: 'none',
+                              background: u.activo ? 'var(--amber-soft)' : 'var(--green-soft)',
+                              fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.08em',
+                              color: u.activo ? 'var(--amber)' : 'var(--green)',
+                            }}>
+                              {u.activo ? 'DESACTIVAR' : 'ACTIVAR'}
+                            </button>
+                            <button onClick={() => setResetUser(u)} style={{
+                              padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                              background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                              fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.08em',
+                            }}>
+                              RESET PWD
+                            </button>
+                            <button onClick={() => deleteUser(u)} style={{
+                              padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                              background: 'var(--accent-soft)', border: '1px solid var(--accent-border)',
+                              fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--accent)', letterSpacing: '0.08em',
+                            }}>
+                              ELIMINAR
+                            </button>
+                          </div>
+                        )}
+                        {u.rol === 'admin' && (
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {users.length === 0 && <Empty msg="Sin usuarios registrados" />}
             </div>
           </Card>
         </div>
+
+        {/* ALERTAS REALES */}
+        <Card>
+          <Label>ALERTAS RECIENTES</Label>
+          {alerts.length === 0
+            ? <Empty msg="Sin alertas registradas" />
+            : alerts.map((a, i) => {
+                const c = a.tipo_incidencia === 'Robo' ? 'var(--accent)' : a.tipo_incidencia === 'Movimiento' ? 'var(--amber)' : 'var(--green)';
+                return (
+                  <div key={a.id_alerta} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < alerts.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <Dot color={c} pulse={a.estado_alerta === 'pendiente'} size={6} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>{a.tipo_incidencia}</span>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)' }}>
+                          {a.fecha_hora ? new Date(a.fecha_hora).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>
+                        {a.estado_alerta?.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+          }
+        </Card>
+
+        {/* RUTAS REALES */}
+        <Card>
+          <Label>RUTAS RECIENTES — TODOS</Label>
+          {routes.length === 0
+            ? <Empty msg="Sin rutas registradas" />
+            : routes.map((r, i) => (
+                <div key={r.id_ruta} style={{ padding: '9px 0', borderBottom: i < routes.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>
+                      {r.fecha_inicio ? new Date(r.fecha_inicio).toLocaleDateString('es-PE') : '—'}
+                    </span>
+                    <span style={{
+                      fontFamily: 'JetBrains Mono', fontSize: 8,
+                      color: r.estado_viaje === 'completado' ? 'var(--green)' : r.estado_viaje === 'alerta' ? 'var(--accent)' : 'var(--amber)',
+                      background: r.estado_viaje === 'completado' ? 'var(--green-soft)' : r.estado_viaje === 'alerta' ? 'var(--accent-soft)' : 'var(--amber-soft)',
+                      border: `1px solid ${r.estado_viaje === 'completado' ? 'var(--green-border)' : r.estado_viaje === 'alerta' ? 'var(--accent-border)' : 'var(--amber-border)'}`,
+                      padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap',
+                    }}>{r.estado_viaje?.toUpperCase()}</span>
+                  </div>
+                  {r.distancia_km && <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 300, color: 'var(--text-primary)' }}>{parseFloat(r.distancia_km).toFixed(1)} km</span>}
+                  {r.origen && <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{r.origen} → {r.destino}</p>}
+                </div>
+              ))
+          }
+        </Card>
       </div>
+
+      {/* Modal reset password */}
+      {resetUser && (
+        <ResetPasswordModal
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+          onSave={() => { setResetUser(null); setActionMsg('Contraseña reseteada correctamente'); setTimeout(() => setActionMsg(''), 3000); }}
+        />
+      )}
     </div>
   );
 }
