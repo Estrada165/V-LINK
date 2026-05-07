@@ -22,15 +22,7 @@ const supabase = createClient(
 const app = express();
 
 app.use(cors({
-  origin: (origin, cb) => {
-    const allowed = [
-      'http://localhost:3000',
-      'https://v-link-eight.vercel.app',
-      process.env.FRONTEND_ORIGIN,
-    ].filter(Boolean);
-    if (!origin || allowed.includes(origin)) return cb(null, true);
-    cb(new Error('CORS bloqueado: ' + origin));
-  },
+  origin: true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10kb' }));
