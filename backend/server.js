@@ -5,10 +5,12 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const ws      = require('ws');
 
-// Parchear WebSocket globalmente ANTES de importar Supabase
-if (!globalThis.WebSocket) {
-  globalThis.WebSocket = ws.WebSocket || ws;
-}
+// Compatibilidad WebSocket Node 18/20
+try {
+  if (typeof globalThis !== 'undefined' && !globalThis.WebSocket) {
+    globalThis.WebSocket = require('ws');
+  }
+} catch(e) {}
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -18,13 +20,16 @@ const supabase = createClient(
 );
 
 const app = express();
-// ... resto igual
 
 app.use(cors({
   origin: (origin, cb) => {
-    const allowed = ['http://localhost:3000', process.env.FRONTEND_ORIGIN].filter(Boolean);
+    const allowed = [
+      'http://localhost:3000',
+      'https://v-link-eight.vercel.app',
+      process.env.FRONTEND_ORIGIN,
+    ].filter(Boolean);
     if (!origin || allowed.includes(origin)) return cb(null, true);
-    cb(new Error('CORS bloqueado'));
+    cb(new Error('CORS bloqueado: ' + origin));
   },
   credentials: true,
 }));
