@@ -89,8 +89,15 @@ export const adminService = {
 };
 
 export const configService = {
-  get:  (vehiculoId) => api.get(`/config/${vehiculoId}`).then(r => r.data),
-  save: (data)       => api.post('/config', data).then(r => r.data),
+  get: async (vehiculoId) => {
+    try {
+      const r = await api.get(`/config/${vehiculoId}`);
+      return r.data;
+    } catch {
+      return {}; // sin config aún, usar defaults del frontend
+    }
+  },
+  save: (data) => api.post('/config', data).then(r => r.data),
 };
 
 export const healthService = {

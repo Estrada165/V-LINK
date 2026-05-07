@@ -1,43 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    <!-- PWA / Theme -->
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="background-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MOTOGUARD" />
+
+    <!-- SEO / Description -->
+    <meta name="description" content="MOTOGUARD — Sistema de seguridad vehicular con anillo IoT BLE para motocicletas. Monitoreo GPS, alertas en tiempo real y modos de protección." />
+    <meta name="keywords" content="motoguard, seguridad, motocicleta, IoT, GPS, anillo BLE" />
+    <meta name="author" content="Equipo V-LINK" />
+
+    <!-- Open Graph (WhatsApp/redes sociales) -->
+    <meta property="og:title" content="MOTOGUARD — Seguridad Vehicular" />
+    <meta property="og:description" content="Sistema de seguridad para motocicletas con anillo IoT BLE" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="%PUBLIC_URL%/logo512.png" />
+
+    <!-- Icons -->
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="%PUBLIC_URL%/logo512.png" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet" />
+
+    <title>MOTOGUARD</title>
+
+    <style>
+      /* Evitar flash blanco al cargar */
+      html, body { background-color: #0a0a0a; margin: 0; padding: 0; }
+      /* Evitar scroll horizontal en móvil */
+      body { overflow-x: hidden; }
+      /* Loading spinner mientras carga React */
+      #root:empty::after {
+        content: '';
+        display: block;
+        width: 32px; height: 32px;
+        border: 2px solid #1f1f1f;
+        border-top-color: #e03030;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>Necesitas habilitar JavaScript para usar MOTOGUARD.</noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
   </body>
 </html>

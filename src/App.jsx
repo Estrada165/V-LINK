@@ -2,16 +2,16 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login         from './pages/Login';
+import Login          from './pages/Login';
 import DashboardAdmin from './pages/DashboardAdmin';
 import DashboardUser  from './pages/DashboardUser';
-import MapPage       from './pages/MapPage';
-import RoutesPage    from './pages/Routes';
-import Settings      from './pages/Settings';
-import Profile       from './pages/Profile';
-import { mockVehicle } from './mocks/mockData';
+import MapPage        from './pages/MapPage';
+import RoutesPage     from './pages/Routes';
+import Settings       from './pages/Settings';
+import Profile        from './pages/Profile';
+import UsersAdmin     from './pages/UsersAdmin';
 
-/* ── Icons ────────────────────────────────────────────────── */
+/* ── Icons ──────────────────────────────────────────────────── */
 const IC = {
   dashboard: () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
   map:       () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="3 7 9 4 15 7 21 4 21 17 15 20 9 17 3 20"/><line x1="9" y1="4" x2="9" y2="17"/><line x1="15" y1="7" x2="15" y2="20"/></svg>,
@@ -21,39 +21,41 @@ const IC = {
   users:     () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
 };
 
-const pageTitles = {
-  '/dashboard': 'Panel de Control',
-  '/map':       'Mapa Táctico · Piura',
-  '/routes':    'Rutas',
-  '/settings':  'Ajustes de Hardware',
-  '/profile':   'Mi Perfil',
-};
-
-/* ── Protected Route ─────────────────────────────────────── */
-function ProtectedRoute({ children }) {
-  const { currentUser } = useAuth();
-  if (!currentUser) return <Navigate to="/" />;
-  return children;
-}
-
-/* ── Nav items by role ───────────────────────────────────── */
 const NAV_ADMIN = [
   { path: '/dashboard', label: 'DASHBOARD', Icon: IC.dashboard },
+  { path: '/users',     label: 'USUARIOS',  Icon: IC.users },
   { path: '/map',       label: 'MAPAS',     Icon: IC.map },
-  { path: '/routes',   label: 'RUTAS',     Icon: IC.routes },
-  { path: '/settings', label: 'AJUSTES',   Icon: IC.settings },
-  { path: '/profile',  label: 'PERFIL',    Icon: IC.profile },
+  { path: '/routes',    label: 'RUTAS',     Icon: IC.routes },
+  { path: '/settings',  label: 'AJUSTES',   Icon: IC.settings },
+  { path: '/profile',   label: 'PERFIL',    Icon: IC.profile },
 ];
 const NAV_USER = [
   { path: '/dashboard', label: 'DASHBOARD', Icon: IC.dashboard },
   { path: '/map',       label: 'MAPAS',     Icon: IC.map },
-  { path: '/routes',   label: 'RUTAS',     Icon: IC.routes },
-  { path: '/settings', label: 'AJUSTES',   Icon: IC.settings },
-  { path: '/profile',  label: 'PERFIL',    Icon: IC.profile },
+  { path: '/routes',    label: 'RUTAS',     Icon: IC.routes },
+  { path: '/settings',  label: 'AJUSTES',   Icon: IC.settings },
+  { path: '/profile',   label: 'PERFIL',    Icon: IC.profile },
 ];
 
-/* ── Sidebar ─────────────────────────────────────────────── */
-function Sidebar() {
+const pageTitles = {
+  '/dashboard': 'Panel de Control',
+  '/users':     'Gestión de Usuarios',
+  '/map':       'Mapa Táctico · Piura',
+  '/routes':    'Rutas',
+  '/settings':  'Ajustes',
+  '/profile':   'Mi Perfil',
+};
+
+/* ── Protected Route ─────────────────────────────────────────── */
+function ProtectedRoute({ children, adminOnly = false }) {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <Navigate to="/" />;
+  if (adminOnly && currentUser.rol !== 'admin') return <Navigate to="/dashboard" />;
+  return children;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+function Sidebar({ pendingCount = 0 }) {
   const { currentUser, logout, isAdmin } = useAuth();
   const location = useLocation();
   const navigate  = useNavigate();
@@ -75,18 +77,16 @@ function Sidebar() {
           </svg>
           <span style={{ fontFamily: 'Bebas Neue', fontSize: 19, letterSpacing: '0.2em', color: 'var(--text-primary)' }}>MOTOGUARD</span>
         </button>
-        {/* Role badge */}
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{
-            fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em',
-            color: isAdmin ? 'var(--accent)' : 'var(--cyan)',
-            background: isAdmin ? 'var(--accent-soft)' : 'var(--cyan-soft)',
-            border: `1px solid ${isAdmin ? 'var(--accent-border)' : 'var(--cyan-border)'}`,
-            padding: '3px 8px', borderRadius: 5,
-          }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, padding: '5px 10px',
+          background: isAdmin ? 'var(--accent-soft)' : 'var(--cyan-soft)',
+          border: `1px solid ${isAdmin ? 'var(--accent-border)' : 'var(--cyan-border)'}`, borderRadius: 7 }}>
+          <div className="anim-blink" style={{ width: 5, height: 5, borderRadius: '50%',
+            background: isAdmin ? 'var(--accent)' : 'var(--cyan)',
+            boxShadow: `0 0 5px ${isAdmin ? 'var(--accent)' : 'var(--cyan)'}` }}/>
+          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8,
+            color: isAdmin ? 'var(--accent)' : 'var(--cyan)', letterSpacing: '0.12em' }}>
             {isAdmin ? 'ADMINISTRADOR' : 'USUARIO'}
           </span>
-          <div className="anim-blink" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 4px var(--green)', marginLeft: 'auto' }} />
         </div>
       </div>
 
@@ -94,6 +94,7 @@ function Sidebar() {
       <nav style={{ flex: 1, padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
         {navItems.map(({ path, label, Icon }) => {
           const active = location.pathname === path;
+          const isPending = path === '/users' && pendingCount > 0;
           return (
             <button key={path} onClick={() => navigate(path)} style={{
               display: 'flex', alignItems: 'center', gap: 11, padding: '9px 12px',
@@ -103,24 +104,38 @@ function Sidebar() {
               color: active ? 'var(--text-primary)' : 'var(--text-muted)',
               fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.1em',
             }}>
-              <span style={{ color: active ? 'var(--accent)' : 'inherit', transition: 'color .2s' }}><Icon /></span>
-              {label}
-              {active && <div style={{ marginLeft: 'auto', width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 4px var(--accent)' }} />}
+              <span style={{ color: active ? 'var(--accent)' : 'inherit', transition: 'color .2s', flexShrink: 0 }}><Icon /></span>
+              <span style={{ flex: 1 }}>{label}</span>
+              {isPending && (
+                <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: '#000', fontWeight: 700 }}>{pendingCount}</span>
+                </span>
+              )}
+              {active && !isPending && <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 4px var(--accent)' }}/>}
             </button>
           );
         })}
       </nav>
 
-      {/* User info + logout */}
+      {/* User + logout */}
       <div style={{ padding: '14px 10px', borderTop: '1px solid var(--sidebar-border)' }}>
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: isAdmin ? 'var(--accent-soft)' : 'var(--cyan-soft)', border: `1px solid ${isAdmin ? 'var(--accent-border)' : 'var(--cyan-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: isAdmin ? 'var(--accent)' : 'var(--cyan)' }}>{currentUser?.avatar}</span>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%',
+              background: isAdmin ? 'var(--accent-soft)' : 'var(--cyan-soft)',
+              border: `1px solid ${isAdmin ? 'var(--accent-border)' : 'var(--cyan-border)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: isAdmin ? 'var(--accent)' : 'var(--cyan)' }}>
+                {(currentUser?.nombre_completo || 'U')[0].toUpperCase()}
+              </span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser?.name}</p>
-              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser?.email}</p>
+              <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser?.nombre_completo || 'Usuario'}
+              </p>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser?.correo_electronico || ''}
+              </p>
             </div>
           </div>
         </div>
@@ -142,7 +157,7 @@ function Sidebar() {
   );
 }
 
-/* ── Bottom nav (mobile) ─────────────────────────────────── */
+/* ── Bottom nav mobile ───────────────────────────────────────── */
 function BottomNav() {
   const { isAdmin } = useAuth();
   const location = useLocation();
@@ -163,12 +178,14 @@ function BottomNav() {
   );
 }
 
-/* ── Desktop top bar ─────────────────────────────────────── */
+/* ── Desktop top bar ─────────────────────────────────────────── */
 function DesktopTopBar() {
-  const { currentUser, isAdmin, logout } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const title = pageTitles[location.pathname] || '';
+  const name = (currentUser?.nombre_completo || 'Usuario').split(' ')[0].toUpperCase();
+
   return (
     <header style={{ height: 52, background: 'var(--nav-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, transition: 'background .35s' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -179,9 +196,14 @@ function DesktopTopBar() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)' }}>SLA 99.98%</span>
-        <button onClick={() => navigate('/profile')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: isAdmin ? 'var(--accent-soft)' : 'var(--cyan-soft)', border: `1px solid ${isAdmin ? 'var(--accent-border)' : 'var(--cyan-border)'}`, borderRadius: 6, cursor: 'pointer' }}>
+        <button onClick={() => navigate('/profile')} style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px',
+          background: isAdmin ? 'var(--accent-soft)' : 'var(--cyan-soft)',
+          border: `1px solid ${isAdmin ? 'var(--accent-border)' : 'var(--cyan-border)'}`,
+          borderRadius: 6, cursor: 'pointer',
+        }}>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: isAdmin ? 'var(--accent)' : 'var(--cyan)', letterSpacing: '0.1em' }}>
-            {isAdmin ? 'ADMIN' : currentUser?.name.split(' ')[0].toUpperCase()}
+            {name}
           </span>
         </button>
       </div>
@@ -189,9 +211,8 @@ function DesktopTopBar() {
   );
 }
 
-/* ── Mobile top bar ──────────────────────────────────────── */
+/* ── Mobile top bar ──────────────────────────────────────────── */
 function MobileTopBar() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   return (
     <header style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'var(--nav-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
@@ -207,8 +228,8 @@ function MobileTopBar() {
   );
 }
 
-/* ── Responsive layout ───────────────────────────────────── */
-function AppLayout({ children }) {
+/* ── Responsive layout ───────────────────────────────────────── */
+function AppLayout({ children, pendingCount }) {
   const [isDesktop, setIsDesktop] = React.useState(window.innerWidth >= 768);
   React.useEffect(() => {
     const h = () => setIsDesktop(window.innerWidth >= 768);
@@ -219,7 +240,7 @@ function AppLayout({ children }) {
   if (isDesktop) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh' }}>
-        <Sidebar />
+        <Sidebar pendingCount={pendingCount} />
         <div style={{ marginLeft: 220, flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           <DesktopTopBar />
           <main style={{ flex: 1, background: 'var(--bg-base)', overflowY: 'auto' }}>{children}</main>
@@ -236,13 +257,33 @@ function AppLayout({ children }) {
   );
 }
 
-/* ── Dashboard selector by role ──────────────────────────── */
-function DashboardRoute() {
+/* ── Dashboard wrapper (cuenta pendientes para badge) ─────────── */
+function DashboardWrapper() {
   const { isAdmin } = useAuth();
-  return isAdmin ? <DashboardAdmin /> : <DashboardUser />;
+  const [pendingCount, setPendingCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isAdmin) return;
+    const load = async () => {
+      try {
+        const { adminService } = await import('./services/api');
+        const users = await adminService.getAllUsers();
+        setPendingCount(users.filter(u => !u.activo && u.rol !== 'admin').length);
+      } catch {}
+    };
+    load();
+    const interval = setInterval(load, 30000); // refrescar cada 30s
+    return () => clearInterval(interval);
+  }, [isAdmin]);
+
+  return (
+    <AppLayout pendingCount={pendingCount}>
+      {isAdmin ? <DashboardAdmin pendingCount={pendingCount} /> : <DashboardUser />}
+    </AppLayout>
+  );
 }
 
-/* ── App ─────────────────────────────────────────────────── */
+/* ── App ─────────────────────────────────────────────────────── */
 export default function App() {
   return (
     <AuthProvider>
@@ -250,11 +291,12 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Login />} />
-            <Route path="/dashboard" element={<ProtectedRoute><AppLayout><DashboardRoute /></AppLayout></ProtectedRoute>} />
-            <Route path="/map"       element={<ProtectedRoute><AppLayout><MapPage /></AppLayout></ProtectedRoute>} />
-            <Route path="/routes"    element={<ProtectedRoute><AppLayout><RoutesPage /></AppLayout></ProtectedRoute>} />
-            <Route path="/settings"  element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
-            <Route path="/profile"   element={<ProtectedRoute><AppLayout><Profile /></AppLayout></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper /></ProtectedRoute>} />
+            <Route path="/users"     element={<ProtectedRoute adminOnly><AppLayout pendingCount={0}><UsersAdmin /></AppLayout></ProtectedRoute>} />
+            <Route path="/map"       element={<ProtectedRoute><AppLayout pendingCount={0}><MapPage /></AppLayout></ProtectedRoute>} />
+            <Route path="/routes"    element={<ProtectedRoute><AppLayout pendingCount={0}><RoutesPage /></AppLayout></ProtectedRoute>} />
+            <Route path="/settings"  element={<ProtectedRoute><AppLayout pendingCount={0}><Settings /></AppLayout></ProtectedRoute>} />
+            <Route path="/profile"   element={<ProtectedRoute><AppLayout pendingCount={0}><Profile /></AppLayout></ProtectedRoute>} />
             <Route path="*"          element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>

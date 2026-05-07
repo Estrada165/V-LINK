@@ -115,8 +115,10 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
 // Activar o desactivar usuario
 app.patch('/api/admin/users/:id/toggle-active', requireAuth, requireAdmin, async (req, res) => {
   const { activo } = req.body;
-  const { data, error } = await supabase.from('usuario').update({ activo })
-    .eq('id_usuario', req.params.id).select('id_usuario, nombre_completo, activo').single();
+  const updates = { activo };
+  if (activo) updates.fecha_activacion = new Date().toISOString();
+  const { data, error } = await supabase.from('usuario').update(updates)
+    .eq('id_usuario', req.params.id).select('id_usuario, nombre_completo, activo, fecha_activacion').single();
   if (error) return res.status(500).json({ error: 'Error' });
   res.json(data);
 });
@@ -268,20 +270,73 @@ app.delete('/api/emergency-contacts/:id', requireAuth, async (req, res) => {
   res.json({ message: 'Eliminado' });
 });
 
-// ── CONFIG ───────────────────────────────────────────────────
+// ── Reemplaza estas 2 rutas en tu server.js ──────────────────
+
+// GET /api/config/:vehiculoId
+// Ahora devuelve objeto vacío si no existe (no 404)
 app.get('/api/config/:vehiculoId', requireAuth, async (req, res) => {
-  const { data, error } = await supabase.from('configuracion_sistema')
-    .select('*').eq('id_vehiculo', req.params.vehiculoId).single();
-  if (error) return res.status(404).json({ error: 'Sin configuración' });
+  const { data } = await supabase
+    .from('configuracion_sistema')
+    .select('*')
+    .eq('id_vehiculo', req.params.vehiculoId)
+    .single();
+
+  // Si no existe, devolver valores por defecto (no error)
+  if (!data) {
+    return res.json({
+      id_vehiculo:         parseInt(req.params.vehiculoId),
+      modo_seguridad:      'armado',
+      umbral_apagado_ms:   10,
+      radio_proximidad_cm: 45,
+      alertas_movimiento:  true,
+      rastreo_continuo:    true,
+    });
+  }
   res.json(data);
 });
 
+// POST /api/config
+// Upsert — crea si no existe, actualiza si existe
 app.post('/api/config', requireAuth, async (req, res) => {
-  const { id_vehiculo, modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento, rastreo_continuo } = req.body;
-  const { data, error } = await supabase.from('configuracion_sistema')
-    .upsert([{ id_vehiculo, modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento, rastreo_continuo }], { onConflict: 'id_vehiculo' })
-    .select().single();
-  if (error) return res.status(500).json({ error: 'Error' });
+  const {
+    id_vehiculo, modo_seguridad,
+    umbral_apagado_ms, radio_proximidad_cm,
+    alertas_movimiento, rastreo_continuo
+  } = req.body;
+
+  if (!id_vehiculo) return res.status(400).json({ error: 'id_vehiculo requerido' });
+
+  // Verificar que el vehículo pertenece al usuario (o es admin)
+  if (req.user.rol !== 'admin') {
+    const { data: veh } = await supabase
+      .from('vehiculo')
+      .select('id_vehiculo')
+      .eq('id_vehiculo', id_vehiculo)
+      .eq('id_usuario', req.user.id)
+      .single();
+    if (!veh) return res.status(403).json({ error: 'Vehículo no encontrado o sin permiso' });
+  }
+
+  const { data, error } = await supabase
+    .from('configuracion_sistema')
+    .upsert(
+      {
+        id_vehiculo,
+        modo_seguridad,
+        umbral_apagado_ms,
+        radio_proximidad_cm,
+        alertas_movimiento,
+        rastreo_continuo,
+      },
+      { onConflict: 'id_vehiculo' }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.log('Config upsert error:', error);
+    return res.status(500).json({ error: 'Error al guardar: ' + error.message });
+  }
   res.json(data);
 });
 
