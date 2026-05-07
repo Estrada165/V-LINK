@@ -36,20 +36,6 @@ const Field = ({ label, value, onChange, type = 'text', placeholder = '', readOn
   </div>
 );
 
-const Select = ({ label, value, onChange, options }) => (
-  <div style={{ marginBottom: 14 }}>
-    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 6 }}>{label}</p>
-    <select value={value || ''} onChange={e => onChange(e.target.value)} style={{
-      width: '100%', padding: '10px 12px', background: 'var(--bg-input)',
-      border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)',
-      fontFamily: 'DM Sans', fontSize: 13, outline: 'none', cursor: 'pointer',
-    }}>
-      <option value="">Seleccionar...</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  </div>
-);
-
 const SaveBtn = ({ onSave, saved, loading, label = 'GUARDAR CAMBIOS' }) => (
   <button onClick={onSave} disabled={loading} style={{
     width: '100%', padding: '12px', borderRadius: 10, cursor: loading ? 'wait' : 'pointer',
@@ -186,7 +172,6 @@ export default function Profile() {
     try { await contactService.delete(id); await loadContacts(); } catch {}
   };
 
-  const brands = ['Kawasaki','Honda','Yamaha','Suzuki','Bajaj','TVS','Royal Enfield','KTM','Ducati','Otro'];
 
   return (
     <div style={{ padding: '24px 28px' }} className="anim-fade">
