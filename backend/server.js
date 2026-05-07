@@ -1,23 +1,24 @@
 require('dotenv').config();
-const express    = require('express');
-const cors       = require('cors');
-const bcrypt     = require('bcryptjs');
-const jwt        = require('jsonwebtoken');
+const express = require('express');
+const cors    = require('cors');
+const bcrypt  = require('bcryptjs');
+const jwt     = require('jsonwebtoken');
+const ws      = require('ws');
+
+// Parchear WebSocket globalmente ANTES de importar Supabase
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = ws.WebSocket || ws;
+}
+
 const { createClient } = require('@supabase/supabase-js');
-const ws = require('ws');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    global: {
-      fetch: fetch,
-      WebSocket: ws,
-    },
-  }
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const app = express();
+// ... resto igual
 
 app.use(cors({
   origin: (origin, cb) => {
