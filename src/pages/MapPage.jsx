@@ -238,7 +238,7 @@ const TIME_FILTERS = [
 
 /* ── MapPage ─────────────────────────────────────────────────── */
 export default function MapPage() {
-  const { currentUser, isAdmin } = useAuth();
+const { isAdmin } = useAuth();
   const [allIncidents, setAllIncidents] = useState([]);
   const [incidents,    setIncidents]    = useState([]);
   const [heatPoints,   setHeatPoints]   = useState([]);
