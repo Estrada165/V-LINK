@@ -5,9 +5,21 @@ import ThemeToggle from '../components/ui/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import { vehicleService, alertService, routeService } from '../services/api';
 
+/* ── Utils ──────────────────────────────────────────────────── */
+const fmtDate = (d) => {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('es-PE', {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    day: '2-digit', month: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+};
+
+/* ── Atoms ──────────────────────────────────────────────────── */
 const Card = ({ children, style = {}, onClick }) => (
   <div className={`mg-card${onClick ? ' mg-card-hover' : ''}`}
-    onClick={onClick} style={{ padding: '16px 18px', ...style, cursor: onClick ? 'pointer' : 'default' }}>
+    onClick={onClick}
+    style={{ padding: '16px 18px', ...style, cursor: onClick ? 'pointer' : 'default' }}>
     {children}
   </div>
 );
@@ -25,21 +37,31 @@ const Empty = ({ msg }) => (
 );
 
 const MODES = {
-  armado:     { label: 'ARMADO',     color: 'var(--accent)',    desc: 'Protección activa',   ringStatus: 'armed' },
-  desarmado:  { label: 'DESARMADO',  color: 'var(--text-muted)',desc: 'Sin protección',       ringStatus: 'disarmed' },
-  valet:      { label: 'MODO VALET', color: 'var(--cyan)',      desc: 'Velocidad limitada',   ringStatus: 'valet' },
-  emergencia: { label: 'EMERGENCIA', color: '#ff2222',          desc: 'Ayuda en camino',      ringStatus: 'emergency' },
+  armed:     { label: 'ARMADO',     color: 'var(--accent)',     desc: 'Protección activa',  ringStatus: 'armed' },
+  disarmed:  { label: 'DESARMADO',  color: 'var(--text-muted)', desc: 'Sin protección',      ringStatus: 'disarmed' },
+  valet:     { label: 'MODO VALET', color: 'var(--cyan)',       desc: 'Velocidad limitada',  ringStatus: 'valet' },
+  emergency: { label: 'EMERGENCIA', color: '#ff2222',           desc: 'Ayuda en camino',     ringStatus: 'emergency' },
 };
 
 const sevColor = { high: 'var(--accent)', medium: 'var(--amber)', low: 'var(--green)' };
 
+/* ── Moto icon ───────────────────────────────────────────────── */
+const MotoIcon = ({ color = 'var(--accent)' }) => (
+  <svg viewBox="0 0 32 22" width="22" height="15" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+    <circle cx="5" cy="17" r="4"/><circle cx="27" cy="17" r="4"/>
+    <path d="M9 17L14 7L22 7L27 13"/><path d="M9 17L12 17L14 7"/><path d="M12 17L19 17"/>
+  </svg>
+);
+
 export default function DashboardUser() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const [vehicle,   setVehicle]   = useState(null);
+
+  const [vehicles,  setVehicles]  = useState([]);
+  const [selVeh,    setSelVeh]    = useState(null);  // vehículo seleccionado
   const [alerts,    setAlerts]    = useState([]);
   const [routes,    setRoutes]    = useState([]);
-  const [mode,      setMode]      = useState('armado');
+  const [mode,      setMode]      = useState('armed');
   const [loading,   setLoading]   = useState(true);
 
   useEffect(() => {
@@ -51,7 +73,8 @@ export default function DashboardUser() {
           alertService.getAll(),
           routeService.getAll(),
         ]);
-        setVehicle(vehs[0] || null);  // primer vehículo del usuario
+        setVehicles(vehs);
+        if (vehs.length > 0) setSelVeh(vehs[0]);
         setAlerts(alts.slice(0, 4));
         setRoutes(rts.slice(0, 3));
       } catch (e) { console.error(e); }
@@ -78,16 +101,16 @@ export default function DashboardUser() {
     <div style={{ padding: '24px 28px' }} className="anim-fade">
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
           <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 4 }}>
             BIENVENIDO, {(currentUser?.nombre_completo || '').split(' ')[0].toUpperCase()}
           </p>
           <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>
-            {vehicle ? `${vehicle.marca} ${vehicle.modelo}` : 'SIN VEHÍCULO'}
+            {selVeh ? `${selVeh.marca} ${selVeh.modelo}` : 'SIN VEHÍCULO'}
           </h1>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>
-            {vehicle ? `${vehicle.placa} · ${vehicle.color || ''}` : 'Registra tu moto en Mi Perfil'}
+            {selVeh ? `${selVeh.placa} ${selVeh.color ? `· ${selVeh.color}` : ''}` : 'Registra tu moto en Mi Perfil'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -99,8 +122,36 @@ export default function DashboardUser() {
         </div>
       </div>
 
-      {/* Si no tiene vehículo */}
-      {!vehicle && (
+      {/* Vehicle selector — solo si hay más de 1 */}
+      {vehicles.length > 1 && (
+        <div style={{ marginBottom: 18 }}>
+          <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.14em', marginBottom: 8 }}>SELECCIONAR VEHÍCULO</p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {vehicles.map(v => (
+              <button key={v.id_vehiculo} onClick={() => setSelVeh(v)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                borderRadius: 10, cursor: 'pointer', transition: 'all .2s',
+                background: selVeh?.id_vehiculo === v.id_vehiculo ? 'var(--accent-soft)' : 'var(--bg-card)',
+                border: `1px solid ${selVeh?.id_vehiculo === v.id_vehiculo ? 'var(--accent-border)' : 'var(--border)'}`,
+              }}>
+                <MotoIcon color={selVeh?.id_vehiculo === v.id_vehiculo ? 'var(--accent)' : 'var(--text-muted)'} />
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 12, fontWeight: 500, color: selVeh?.id_vehiculo === v.id_vehiculo ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                    {v.marca} {v.modelo}
+                  </p>
+                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>{v.placa}</p>
+                </div>
+                {selVeh?.id_vehiculo === v.id_vehiculo && (
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 5px var(--accent)', marginLeft: 4 }} />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sin vehículo */}
+      {vehicles.length === 0 && (
         <Card style={{ marginBottom: 20, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
@@ -110,9 +161,7 @@ export default function DashboardUser() {
             <button onClick={() => navigate('/profile')} style={{
               padding: '10px 18px', background: 'var(--accent)', border: 'none', borderRadius: 8,
               cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.1em', color: '#fff',
-            }}>
-              IR A MI PERFIL →
-            </button>
+            }}>IR A MI PERFIL →</button>
           </div>
         </Card>
       )}
@@ -120,23 +169,17 @@ export default function DashboardUser() {
       {/* Main grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
 
-        {/* LEFT: Ring + battery */}
+        {/* Ring + BLE */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Card style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <AnimatedRing status={ringStatus} size={210} />
-            {vehicle && (
+            {selVeh && (
               <div style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
-                    DISPOSITIVO BLE
-                  </span>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>
-                    Pendiente vinculación
-                  </span>
+                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>DISPOSITIVO BLE</span>
+                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>Pendiente vinculación</span>
                 </div>
-                <div style={{ height: 3, borderRadius: 2, background: 'var(--border)' }}>
-                  <div style={{ height: '100%', width: '0%', borderRadius: 2, background: 'var(--text-muted)' }} />
-                </div>
+                <div style={{ height: 3, borderRadius: 2, background: 'var(--border)' }} />
               </div>
             )}
           </Card>
@@ -144,23 +187,21 @@ export default function DashboardUser() {
           {/* Quick links */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {[
-              { label: 'VER EN MAPA', path: '/map', color: 'var(--cyan)' },
-              { label: 'MIS RUTAS',   path: '/routes', color: 'var(--text-secondary)' },
+              { label: 'VER EN MAPA', path: '/map',     color: 'var(--cyan)' },
+              { label: 'MIS RUTAS',   path: '/routes',  color: 'var(--text-secondary)' },
               { label: 'AJUSTES',     path: '/settings', color: 'var(--amber)' },
               { label: 'MI PERFIL',   path: '/profile', color: 'var(--text-secondary)' },
             ].map(q => (
               <button key={q.path} onClick={() => navigate(q.path)} style={{
                 padding: '12px 10px', borderRadius: 10, cursor: 'pointer',
                 background: 'var(--bg-card)', border: '1px solid var(--border)',
-                fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.1em', color: q.color, transition: 'all .2s',
-              }}>
-                {q.label}
-              </button>
+                fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.1em', color: q.color,
+              }}>{q.label}</button>
             ))}
           </div>
         </div>
 
-        {/* CENTER: Security modes */}
+        {/* Modos de seguridad */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Card>
             <Label>MODOS DE SEGURIDAD</Label>
@@ -174,12 +215,9 @@ export default function DashboardUser() {
                     border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border)'}`,
                     borderRadius: 10, cursor: 'pointer', transition: 'all .22s', textAlign: 'left',
                   }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, flexShrink: 0,
-                      boxShadow: active ? `0 0 6px ${m.color}` : 'none' }} />
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, flexShrink: 0, boxShadow: active ? `0 0 6px ${m.color}` : 'none' }} />
                     <div>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.1em', color: active ? m.color : 'var(--text-muted)', display: 'block' }}>
-                        {m.label}
-                      </span>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.1em', color: active ? m.color : 'var(--text-muted)', display: 'block' }}>{m.label}</span>
                       <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', display: 'block' }}>{m.desc}</span>
                     </div>
                     {active && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: m.color, boxShadow: `0 0 5px ${m.color}` }} />}
@@ -187,98 +225,81 @@ export default function DashboardUser() {
                 );
               })}
             </div>
-            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', marginTop: 10, letterSpacing: '0.06em', textAlign: 'center' }}>
-              Control físico disponible al conectar anillo BLE
-            </p>
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', marginTop: 10, textAlign: 'center' }}>Control físico disponible al conectar anillo BLE</p>
           </Card>
 
-          {/* My alerts */}
+          {/* Alertas */}
           <Card>
             <Label action="VER TODAS →" onAction={() => navigate('/map')}>MIS ALERTAS</Label>
-            {alerts.length === 0
-              ? <Empty msg="Sin alertas registradas" />
-              : alerts.map((a, i) => {
-                  const sevLevel = a.tipo_incidencia === 'Robo' ? 'high' : a.tipo_incidencia === 'Movimiento' ? 'medium' : 'low';
-                  const c = sevColor[sevLevel];
-                  return (
-                    <div key={a.id_alerta} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < alerts.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <Dot color={c} pulse={a.estado_alerta === 'pendiente'} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{a.tipo_incidencia}</span>
-                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: c }}>{a.estado_alerta?.toUpperCase()}</span>
-                        </div>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>
-                          {a.fecha_hora ? new Date(a.fecha_hora).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
-                        </span>
+            {alerts.length === 0 ? <Empty msg="Sin alertas registradas" /> :
+              alerts.map((a, i) => {
+                const sevLevel = a.tipo_incidencia?.toLowerCase().includes('robo') ? 'high' : a.tipo_incidencia?.toLowerCase().includes('movimiento') ? 'medium' : 'low';
+                const c = sevColor[sevLevel];
+                return (
+                  <div key={a.id_alerta} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < alerts.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <Dot color={c} pulse={a.estado_alerta === 'pendiente'} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{a.tipo_incidencia}</span>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: c }}>{a.estado_alerta?.toUpperCase()}</span>
                       </div>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>{fmtDate(a.fecha_hora)}</span>
                     </div>
-                  );
-                })
+                  </div>
+                );
+              })
             }
           </Card>
         </div>
 
-        {/* RIGHT: Routes + vehicle summary */}
+        {/* Rutas + vehículo seleccionado */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Card>
             <Label action="VER TODAS →" onAction={() => navigate('/routes')}>MIS RUTAS RECIENTES</Label>
-            {routes.length === 0
-              ? <Empty msg="Sin rutas registradas" />
-              : routes.map((r, i) => (
-                  <div key={r.id_ruta} style={{ padding: '10px 0', borderBottom: i < routes.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>
-                        {r.fecha_inicio ? new Date(r.fecha_inicio).toLocaleDateString('es-PE') : ''}
-                      </span>
-                      <span style={{
-                        fontFamily: 'JetBrains Mono', fontSize: 8,
-                        color: r.estado_viaje === 'completado' ? 'var(--green)' : r.estado_viaje === 'alerta' ? 'var(--accent)' : 'var(--amber)',
-                        background: r.estado_viaje === 'completado' ? 'var(--green-soft)' : r.estado_viaje === 'alerta' ? 'var(--accent-soft)' : 'var(--amber-soft)',
-                        border: `1px solid ${r.estado_viaje === 'completado' ? 'var(--green-border)' : r.estado_viaje === 'alerta' ? 'var(--accent-border)' : 'var(--amber-border)'}`,
-                        padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap',
-                      }}>{r.estado_viaje?.toUpperCase()}</span>
-                    </div>
-                    {r.distancia_km && (
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 300, color: 'var(--text-primary)' }}>
-                        {parseFloat(r.distancia_km).toFixed(1)} km
-                      </span>
-                    )}
-                    {r.origen && r.destino && (
-                      <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {r.origen} → {r.destino}
-                      </p>
-                    )}
+            {routes.length === 0 ? <Empty msg="Sin rutas registradas" /> :
+              routes.map((r, i) => (
+                <div key={r.id_ruta} style={{ padding: '10px 0', borderBottom: i < routes.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>{fmtDate(r.fecha_inicio)}</span>
+                    <span style={{
+                      fontFamily: 'JetBrains Mono', fontSize: 8,
+                      color: r.estado_viaje === 'completado' ? 'var(--green)' : r.estado_viaje === 'alerta' ? 'var(--accent)' : 'var(--amber)',
+                      background: r.estado_viaje === 'completado' ? 'var(--green-soft)' : r.estado_viaje === 'alerta' ? 'var(--accent-soft)' : 'var(--amber-soft)',
+                      border: `1px solid ${r.estado_viaje === 'completado' ? 'var(--green-border)' : r.estado_viaje === 'alerta' ? 'var(--accent-border)' : 'var(--amber-border)'}`,
+                      padding: '1px 6px', borderRadius: 4,
+                    }}>{r.estado_viaje?.toUpperCase()}</span>
                   </div>
-                ))
+                  {r.distancia_km && <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 300, color: 'var(--text-primary)' }}>{parseFloat(r.distancia_km).toFixed(1)} km</span>}
+                </div>
+              ))
             }
           </Card>
 
-          {/* Vehicle card */}
-          {vehicle && (
+          {/* Vehículo seleccionado */}
+          {selVeh && (
             <Card>
-              <Label>MI VEHÍCULO</Label>
+              <Label>VEHÍCULO ACTIVO</Label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 10, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg viewBox="0 0 32 22" width="26" height="18" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round">
-                    <circle cx="5" cy="17" r="4"/><circle cx="27" cy="17" r="4"/>
-                    <path d="M9 17L14 7L22 7L27 13"/><path d="M9 17L12 17L14 7"/><path d="M12 17L19 17"/>
-                  </svg>
+                  <MotoIcon />
                 </div>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{vehicle.marca} {vehicle.modelo}</p>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{selVeh.marca} {selVeh.modelo}</p>
                   <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                    {vehicle.placa} {vehicle.anio ? `· ${vehicle.anio}` : ''} {vehicle.color ? `· ${vehicle.color}` : ''}
+                    {selVeh.placa} {selVeh.anio ? `· ${selVeh.anio}` : ''} {selVeh.color ? `· ${selVeh.color}` : ''}
                   </p>
+                  {vehicles.length > 1 && (
+                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--accent)', marginTop: 4 }}>
+                      {vehicles.indexOf(selVeh) + 1} de {vehicles.length} vehículos
+                    </p>
+                  )}
                 </div>
               </div>
               <button onClick={() => navigate('/profile')} style={{
                 width: '100%', padding: '9px', borderRadius: 8, cursor: 'pointer',
                 background: 'var(--bg-surface)', border: '1px solid var(--border)',
                 fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.1em', color: 'var(--text-muted)',
-              }}>
-                EDITAR EN MI PERFIL →
-              </button>
+              }}>EDITAR EN MI PERFIL →</button>
             </Card>
           )}
         </div>

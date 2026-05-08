@@ -64,6 +64,7 @@ export const alertService = {
   getAll:  ()     => api.get('/alerts').then(r => r.data),
   report:  (data) => api.post('/alerts', data).then(r => r.data),
   update:  (id, estado_alerta) => api.patch(`/alerts/${id}`, { estado_alerta }).then(r => r.data),
+  delete:  (id)   => api.delete(`/alerts/${id}`).then(r => r.data),
 };
 
 export const heatmapService = {
@@ -105,5 +106,6 @@ export const healthService = {
     try { await api.get('/health'); return true; } catch { return false; }
   },
 };
+
 
 export default api;

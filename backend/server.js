@@ -3,9 +3,8 @@ const express = require('express');
 const cors    = require('cors');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
-const ws      = require('ws');
 
-// Compatibilidad WebSocket Node 18/20
+// Compatibilidad WebSocket Node 18 — ANTES de importar Supabase
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.WebSocket) {
     globalThis.WebSocket = require('ws');
@@ -21,12 +20,10 @@ const supabase = createClient(
 
 const app = express();
 
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10kb' }));
 
+/* ── Middlewares ──────────────────────────────────────────── */
 function requireAuth(req, res, next) {
   const h = req.headers.authorization;
   if (!h?.startsWith('Bearer ')) return res.status(401).json({ error: 'Token requerido' });
@@ -38,9 +35,10 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+/* ── Health ───────────────────────────────────────────────── */
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
 
-// ── REGISTRO — cuenta queda inactiva hasta que admin la active ──
+/* ── AUTH ─────────────────────────────────────────────────── */
 app.post('/api/auth/register', async (req, res) => {
   const { nombre_completo, correo_electronico, telefono, direccion, password } = req.body;
   if (!nombre_completo || !correo_electronico || !password)
@@ -60,7 +58,6 @@ app.post('/api/auth/register', async (req, res) => {
   res.status(201).json({ message: 'Cuenta creada. Espera que el administrador active tu cuenta.', user: data });
 });
 
-// ── LOGIN ────────────────────────────────────────────────────
 app.post('/api/auth/login', async (req, res) => {
   const { correo_electronico, password } = req.body;
   if (!correo_electronico || !password) return res.status(400).json({ error: 'Credenciales requeridas' });
@@ -86,15 +83,16 @@ app.patch('/api/auth/change-password', requireAuth, async (req, res) => {
   if (!current_password || !new_password) return res.status(400).json({ error: 'Faltan campos' });
   if (new_password.length < 8) return res.status(400).json({ error: 'Mínimo 8 caracteres' });
   const { data: u } = await supabase.from('usuario').select('password_hash').eq('id_usuario', req.user.id).single();
-  if (!await bcrypt.compare(current_password, u.password_hash)) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+  if (!await bcrypt.compare(current_password, u.password_hash))
+    return res.status(401).json({ error: 'Contraseña actual incorrecta' });
   await supabase.from('usuario').update({ password_hash: await bcrypt.hash(new_password, 10) }).eq('id_usuario', req.user.id);
   res.json({ message: 'Contraseña actualizada' });
 });
 
-// ── PROFILE ──────────────────────────────────────────────────
+/* ── PROFILE ──────────────────────────────────────────────── */
 app.get('/api/users/me', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('usuario')
-    .select('id_usuario, nombre_completo, correo_electronico, telefono, direccion, rol, fecha_registro, plan_suscripcion, activo')
+    .select('id_usuario, nombre_completo, correo_electronico, telefono, direccion, rol, fecha_registro, plan_suscripcion, activo, fecha_activacion')
     .eq('id_usuario', req.user.id).single();
   if (error) return res.status(404).json({ error: 'No encontrado' });
   res.json(data);
@@ -112,16 +110,15 @@ app.patch('/api/users/me', requireAuth, async (req, res) => {
   res.json(data);
 });
 
-// ── ADMIN — USUARIOS ─────────────────────────────────────────
+/* ── ADMIN — USUARIOS ─────────────────────────────────────── */
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   const { data, error } = await supabase.from('usuario')
-    .select('id_usuario, nombre_completo, correo_electronico, rol, telefono, fecha_registro, plan_suscripcion, activo')
+    .select('id_usuario, nombre_completo, correo_electronico, rol, telefono, fecha_registro, plan_suscripcion, activo, fecha_activacion')
     .order('fecha_registro', { ascending: false });
   if (error) return res.status(500).json({ error: 'Error' });
   res.json(data);
 });
 
-// Activar o desactivar usuario
 app.patch('/api/admin/users/:id/toggle-active', requireAuth, requireAdmin, async (req, res) => {
   const { activo } = req.body;
   const updates = { activo };
@@ -132,7 +129,6 @@ app.patch('/api/admin/users/:id/toggle-active', requireAuth, requireAdmin, async
   res.json(data);
 });
 
-// Resetear contraseña
 app.patch('/api/admin/users/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
   const { new_password } = req.body;
   if (!new_password || new_password.length < 8) return res.status(400).json({ error: 'Mínimo 8 caracteres' });
@@ -140,7 +136,6 @@ app.patch('/api/admin/users/:id/reset-password', requireAuth, requireAdmin, asyn
   res.json({ message: 'Contraseña reseteada' });
 });
 
-// Cambiar rol
 app.patch('/api/admin/users/:id/role', requireAuth, requireAdmin, async (req, res) => {
   const { rol } = req.body;
   if (!['admin', 'usuario'].includes(rol)) return res.status(400).json({ error: 'Rol inválido' });
@@ -150,14 +145,29 @@ app.patch('/api/admin/users/:id/role', requireAuth, requireAdmin, async (req, re
   res.json(data);
 });
 
-// Eliminar usuario
 app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
   const { error } = await supabase.from('usuario').delete().eq('id_usuario', req.params.id);
   if (error) return res.status(500).json({ error: 'Error' });
   res.json({ message: 'Usuario eliminado' });
 });
 
-// ── VEHICLES ─────────────────────────────────────────────────
+/* ── ADMIN — BACKUP ───────────────────────────────────────── */
+app.get('/api/admin/backup', requireAuth, requireAdmin, async (req, res) => {
+  const tables = ['usuario', 'vehiculo', 'alerta', 'ruta', 'contacto_emergencia', 'configuracion_sistema'];
+  const backup = { exportado_en: new Date().toISOString(), tablas: {} };
+
+  for (const table of tables) {
+    const { data } = await supabase.from(table).select('*');
+    backup.tablas[table] = data || [];
+  }
+
+  const fecha = new Date().toISOString().split('T')[0];
+  res.setHeader('Content-Disposition', `attachment; filename=motoguard_backup_${fecha}.json`);
+  res.setHeader('Content-Type', 'application/json');
+  res.json(backup);
+});
+
+/* ── VEHICLES ─────────────────────────────────────────────── */
 app.get('/api/vehicles', requireAuth, async (req, res) => {
   let q = supabase.from('vehiculo').select('*');
   if (req.user.rol !== 'admin') q = q.eq('id_usuario', req.user.id);
@@ -181,7 +191,9 @@ app.post('/api/vehicles', requireAuth, async (req, res) => {
 
 app.patch('/api/vehicles/:id', requireAuth, async (req, res) => {
   const updates = {};
-  ['marca','modelo','placa','cilindraje','anio','color'].forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+  ['marca','modelo','placa','cilindraje','anio','color'].forEach(k => {
+    if (req.body[k] !== undefined) updates[k] = req.body[k];
+  });
   let q = supabase.from('vehiculo').update(updates).eq('id_vehiculo', req.params.id);
   if (req.user.rol !== 'admin') q = q.eq('id_usuario', req.user.id);
   const { data, error } = await q.select().single();
@@ -197,9 +209,9 @@ app.delete('/api/vehicles/:id', requireAuth, async (req, res) => {
   res.json({ message: 'Eliminado' });
 });
 
-// ── ALERTS ───────────────────────────────────────────────────
+/* ── ALERTS ───────────────────────────────────────────────── */
 app.get('/api/alerts', requireAuth, async (req, res) => {
-  let q = supabase.from('alerta').select('*').order('fecha_hora', { ascending: false }).limit(50);
+  let q = supabase.from('alerta').select('*').order('fecha_hora', { ascending: false }).limit(100);
   if (req.user.rol !== 'admin') {
     const { data: veh } = await supabase.from('vehiculo').select('id_vehiculo').eq('id_usuario', req.user.id);
     const ids = (veh || []).map(v => v.id_vehiculo);
@@ -215,32 +227,68 @@ app.post('/api/alerts', requireAuth, async (req, res) => {
   const { id_vehiculo, tipo_incidencia, latitud, longitud } = req.body;
   if (!tipo_incidencia || latitud === undefined || longitud === undefined)
     return res.status(400).json({ error: 'Faltan campos' });
-  const { data, error } = await supabase.from('alerta')
-    .insert([{ id_vehiculo, tipo_incidencia, latitud, longitud, estado_alerta: 'pendiente' }])
-    .select().single();
-  if (error) return res.status(500).json({ error: 'Error' });
+
+ // POST /api/alerts — nuevo estado: 'activo' en lugar de 'pendiente'
+const { data, error } = await supabase.from('alerta')
+  .insert([{ id_vehiculo, tipo_incidencia, latitud, longitud, estado_alerta: 'activo', id_usuario: req.user.id }])
+  .select().single();
+  if (error) return res.status(500).json({ error: 'Error: ' + error.message });
   res.status(201).json(data);
 });
 
 app.patch('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { data, error } = await supabase.from('alerta').update({ estado_alerta: req.body.estado_alerta })
-    .eq('id_alerta', req.params.id).select().single();
+  const { estado_alerta } = req.body;
+  if (!['pendiente','activo','resuelto'].includes(estado_alerta))
+    return res.status(400).json({ error: 'Estado inválido' });
+  const { data, error } = await supabase.from('alerta')
+    .update({ estado_alerta }).eq('id_alerta', req.params.id).select().single();
   if (error) return res.status(500).json({ error: 'Error' });
   res.json(data);
 });
 
-// ── HEATMAP ──────────────────────────────────────────────────
+app.delete('/api/alerts/:id', requireAuth, async (req, res) => {
+  if (req.user.rol === 'admin') {
+    await supabase.from('alerta').delete().eq('id_alerta', req.params.id);
+    return res.json({ message: 'Eliminado' });
+  }
+  // Usuario solo borra los suyos
+  const { error } = await supabase.from('alerta').delete()
+    .eq('id_alerta', req.params.id)
+    .eq('id_usuario', req.user.id);
+  if (error) return res.status(500).json({ error: 'Error' });
+  res.json({ message: 'Eliminado' });
+});
+// GET /api/heatmap — peso por tipo Y antigüedad
 app.get('/api/heatmap', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('alerta')
-    .select('latitud, longitud, tipo_incidencia').not('latitud', 'is', null).not('longitud', 'is', null).limit(500);
+    .select('latitud, longitud, tipo_incidencia, estado_alerta, fecha_hora')
+    .not('latitud', 'is', null).not('longitud', 'is', null)
+    .eq('estado_alerta', 'activo')  // solo activos en el heatmap
+    .limit(500);
   if (error) return res.status(500).json({ error: 'Error' });
-  res.json((data || []).map(a => ({
-    lat: parseFloat(a.latitud), lng: parseFloat(a.longitud),
-    weight: a.tipo_incidencia === 'Robo' ? 1.0 : a.tipo_incidencia === 'Movimiento' ? 0.7 : 0.4,
-  })));
+
+  const ahora = Date.now();
+  res.json((data || []).map(a => {
+    const t = (a.tipo_incidencia || '').toLowerCase();
+    const peso_tipo = t.includes('robo') || t.includes('emergencia') ? 1.0
+                    : t.includes('sospech') || t.includes('accidente') ? 0.7 : 0.4;
+    
+    // Peso por antigüedad — más reciente = más peso
+    const diasAtras = (ahora - new Date(a.fecha_hora).getTime()) / (1000 * 60 * 60 * 24);
+    const peso_tiempo = diasAtras <= 1 ? 1.0      // último día — máximo
+                      : diasAtras <= 7 ? 0.8      // última semana
+                      : diasAtras <= 30 ? 0.5     // último mes
+                      : 0.25;                      // más antiguo — mínimo
+
+    return {
+      lat: parseFloat(a.latitud),
+      lng: parseFloat(a.longitud),
+      weight: peso_tipo * peso_tiempo,
+    };
+  }));
 });
 
-// ── ROUTES ───────────────────────────────────────────────────
+/* ── ROUTES ───────────────────────────────────────────────── */
 app.get('/api/routes', requireAuth, async (req, res) => {
   let q = supabase.from('ruta').select('*').order('fecha_inicio', { ascending: false });
   if (req.user.rol !== 'admin') {
@@ -254,7 +302,7 @@ app.get('/api/routes', requireAuth, async (req, res) => {
   res.json(data || []);
 });
 
-// ── EMERGENCY CONTACTS ───────────────────────────────────────
+/* ── EMERGENCY CONTACTS ───────────────────────────────────── */
 app.get('/api/emergency-contacts', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('contacto_emergencia')
     .select('*').eq('id_usuario', req.user.id).order('orden_prioridad');
@@ -279,18 +327,10 @@ app.delete('/api/emergency-contacts/:id', requireAuth, async (req, res) => {
   res.json({ message: 'Eliminado' });
 });
 
-// ── Reemplaza estas 2 rutas en tu server.js ──────────────────
-
-// GET /api/config/:vehiculoId
-// Ahora devuelve objeto vacío si no existe (no 404)
+/* ── CONFIG ───────────────────────────────────────────────── */
 app.get('/api/config/:vehiculoId', requireAuth, async (req, res) => {
-  const { data } = await supabase
-    .from('configuracion_sistema')
-    .select('*')
-    .eq('id_vehiculo', req.params.vehiculoId)
-    .single();
-
-  // Si no existe, devolver valores por defecto (no error)
+  const { data } = await supabase.from('configuracion_sistema')
+    .select('*').eq('id_vehiculo', req.params.vehiculoId).single();
   if (!data) {
     return res.json({
       id_vehiculo:         parseInt(req.params.vehiculoId),
@@ -304,49 +344,31 @@ app.get('/api/config/:vehiculoId', requireAuth, async (req, res) => {
   res.json(data);
 });
 
-// POST /api/config
-// Upsert — crea si no existe, actualiza si existe
 app.post('/api/config', requireAuth, async (req, res) => {
-  const {
-    id_vehiculo, modo_seguridad,
-    umbral_apagado_ms, radio_proximidad_cm,
-    alertas_movimiento, rastreo_continuo
-  } = req.body;
-
+  const { id_vehiculo, modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento, rastreo_continuo } = req.body;
   if (!id_vehiculo) return res.status(400).json({ error: 'id_vehiculo requerido' });
 
-  // Verificar que el vehículo pertenece al usuario (o es admin)
   if (req.user.rol !== 'admin') {
-    const { data: veh } = await supabase
-      .from('vehiculo')
-      .select('id_vehiculo')
-      .eq('id_vehiculo', id_vehiculo)
-      .eq('id_usuario', req.user.id)
-      .single();
-    if (!veh) return res.status(403).json({ error: 'Vehículo no encontrado o sin permiso' });
+    const { data: veh } = await supabase.from('vehiculo')
+      .select('id_vehiculo').eq('id_vehiculo', id_vehiculo).eq('id_usuario', req.user.id).single();
+    if (!veh) return res.status(403).json({ error: 'Sin permiso' });
   }
 
-  const { data, error } = await supabase
-    .from('configuracion_sistema')
-    .upsert(
-      {
-        id_vehiculo,
-        modo_seguridad,
-        umbral_apagado_ms,
-        radio_proximidad_cm,
-        alertas_movimiento,
-        rastreo_continuo,
-      },
-      { onConflict: 'id_vehiculo' }
-    )
-    .select()
-    .single();
-
-  if (error) {
-    console.log('Config upsert error:', error);
-    return res.status(500).json({ error: 'Error al guardar: ' + error.message });
-  }
+  const { data, error } = await supabase.from('configuracion_sistema')
+    .upsert([{ id_vehiculo, modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento, rastreo_continuo }],
+      { onConflict: 'id_vehiculo' })
+    .select().single();
+  if (error) return res.status(500).json({ error: 'Error: ' + error.message });
   res.json(data);
+});
+
+/* ── IoT endpoint (preparado para anillo BLE) ─────────────── */
+app.post('/api/iot/telemetry', async (req, res) => {
+  const apiKey = req.headers['x-device-api-key'];
+  if (apiKey !== process.env.IOT_API_KEY)
+    return res.status(401).json({ error: 'API key inválida' });
+  // Se implementará cuando el hardware esté disponible
+  res.status(202).json({ received: true });
 });
 
 const PORT = process.env.PORT || 4000;
