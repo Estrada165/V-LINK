@@ -22,6 +22,10 @@ const app = express();
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10kb' }));
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
 
 /* ── Middlewares ──────────────────────────────────────────── */
 function requireAuth(req, res, next) {
