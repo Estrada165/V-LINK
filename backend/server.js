@@ -377,5 +377,3 @@ app.post('/api/iot/telemetry', async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`MOTOGUARD API en puerto ${PORT}`));
- 
- 
