@@ -247,11 +247,11 @@ app.patch('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 app.delete('/api/alerts/:id', requireAuth, async (req, res) => {
+  console.log('DELETE ALERTS HIT - id:', req.params.id, 'user:', req.user.id, 'rol:', req.user.rol);
   if (req.user.rol === 'admin') {
     await supabase.from('alerta').delete().eq('id_alerta', req.params.id);
     return res.json({ message: 'Eliminado' });
   }
-  // Usuario solo borra los suyos
   const { error } = await supabase.from('alerta').delete()
     .eq('id_alerta', req.params.id)
     .eq('id_usuario', req.user.id);
@@ -372,5 +372,6 @@ app.post('/api/iot/telemetry', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`MOTOGUARD API en puerto ${PORT}`)); 
+app.listen(PORT, () => console.log(`MOTOGUARD API en puerto ${PORT}`));
+ 
  
