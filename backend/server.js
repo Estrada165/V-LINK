@@ -4,7 +4,6 @@ const cors    = require('cors');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 
-// Compatibilidad WebSocket Node 18 — ANTES de importar Supabase
 try {
   if (typeof globalThis !== 'undefined' && !globalThis.WebSocket) {
     globalThis.WebSocket = require('ws');
@@ -19,15 +18,9 @@ const supabase = createClient(
 );
 
 const app = express();
-
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10kb' }));
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  next();
-});
 
-/* ── Middlewares ──────────────────────────────────────────── */
 function requireAuth(req, res, next) {
   const h = req.headers.authorization;
   if (!h?.startsWith('Bearer ')) return res.status(401).json({ error: 'Token requerido' });
@@ -50,7 +43,7 @@ app.post('/api/auth/register', async (req, res) => {
   if (password.length < 8)
     return res.status(400).json({ error: 'Contraseña mínimo 8 caracteres' });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 8); // factor 8 = ~50ms, óptimo para registros masivos
   const { data, error } = await supabase.from('usuario')
     .insert([{ nombre_completo, correo_electronico, telefono, direccion, password_hash: hash, rol: 'usuario', activo: false }])
     .select('id_usuario, nombre_completo, correo_electronico, rol, activo').single();
@@ -59,7 +52,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (error.code === '23505') return res.status(409).json({ error: 'Correo ya registrado' });
     return res.status(500).json({ error: 'Error al registrar: ' + error.message });
   }
-  res.status(201).json({ message: 'Cuenta creada. Espera que el administrador active tu cuenta.', user: data });
+  res.status(201).json({ message: 'Cuenta creada. El administrador activará tu cuenta en breve.', user: data });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -89,7 +82,7 @@ app.patch('/api/auth/change-password', requireAuth, async (req, res) => {
   const { data: u } = await supabase.from('usuario').select('password_hash').eq('id_usuario', req.user.id).single();
   if (!await bcrypt.compare(current_password, u.password_hash))
     return res.status(401).json({ error: 'Contraseña actual incorrecta' });
-  await supabase.from('usuario').update({ password_hash: await bcrypt.hash(new_password, 10) }).eq('id_usuario', req.user.id);
+  await supabase.from('usuario').update({ password_hash: await bcrypt.hash(new_password, 8) }).eq('id_usuario', req.user.id);
   res.json({ message: 'Contraseña actualizada' });
 });
 
@@ -114,13 +107,97 @@ app.patch('/api/users/me', requireAuth, async (req, res) => {
   res.json(data);
 });
 
-/* ── ADMIN — USUARIOS ─────────────────────────────────────── */
+/* ── ADMIN — STATS (1 sola petición para el dashboard) ───── */
+app.get('/api/admin/stats', requireAuth, requireAdmin, async (req, res) => {
+  const [usersRes, alertsRes, vehiclesRes, routesRes] = await Promise.all([
+    supabase.from('usuario').select('id_usuario, activo, rol', { count: 'exact' }),
+    supabase.from('alerta').select('id_alerta, estado_alerta, fecha_hora', { count: 'exact' }),
+    supabase.from('vehiculo').select('id_vehiculo', { count: 'exact' }),
+    supabase.from('ruta').select('id_ruta', { count: 'exact' }),
+  ]);
+
+  const users  = usersRes.data  || [];
+  const alerts = alertsRes.data || [];
+  const hoy    = new Date().toISOString().split('T')[0];
+
+  res.json({
+    usuarios: {
+      total:      usersRes.count  || 0,
+      activos:    users.filter(u => u.activo).length,
+      pendientes: users.filter(u => !u.activo && u.rol !== 'admin').length,
+      admins:     users.filter(u => u.rol === 'admin').length,
+    },
+    alertas: {
+      total:   alertsRes.count || 0,
+      activas: alerts.filter(a => a.estado_alerta === 'activo').length,
+      hoy:     alerts.filter(a => a.fecha_hora?.startsWith(hoy)).length,
+    },
+    vehiculos: vehiclesRes.count || 0,
+    rutas:     routesRes.count   || 0,
+  });
+});
+
+/* ── ADMIN — USUARIOS con búsqueda en BD y paginación ────── */
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
-  const { data, error } = await supabase.from('usuario')
-    .select('id_usuario, nombre_completo, correo_electronico, rol, telefono, fecha_registro, plan_suscripcion, activo, fecha_activacion')
-    .order('fecha_registro', { ascending: false });
-  if (error) return res.status(500).json({ error: 'Error' });
-  res.json(data);
+  const { search, activo, desde, hasta, page = 1, limit = 100 } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  let q = supabase.from('usuario')
+    .select('id_usuario, nombre_completo, correo_electronico, rol, telefono, fecha_registro, plan_suscripcion, activo, fecha_activacion', { count: 'exact' })
+    .order('fecha_registro', { ascending: false })
+    .range(offset, offset + parseInt(limit) - 1);
+
+  if (search && search.trim()) {
+    q = q.or(`nombre_completo.ilike.%${search}%,correo_electronico.ilike.%${search}%,telefono.ilike.%${search}%`);
+  }
+  if (activo !== undefined && activo !== '') q = q.eq('activo', activo === 'true');
+  if (desde) q = q.gte('fecha_registro', desde);
+  if (hasta) q = q.lte('fecha_registro', hasta + 'T23:59:59');
+
+  const { data, error, count } = await q;
+  if (error) return res.status(500).json({ error: 'Error: ' + error.message });
+
+  res.json({
+    users: data || [],
+    total: count || 0,
+    page:  parseInt(page),
+    pages: Math.ceil((count || 0) / parseInt(limit)),
+  });
+});
+
+/* ── ADMIN — ACCIÓN MASIVA (1 sola query para N usuarios) ── */
+app.post('/api/admin/users/bulk-action', requireAuth, requireAdmin, async (req, res) => {
+  const { ids, action } = req.body;
+  if (!ids || !Array.isArray(ids) || ids.length === 0)
+    return res.status(400).json({ error: 'ids requerido' });
+  if (!['activate', 'deactivate', 'delete'].includes(action))
+    return res.status(400).json({ error: 'action inválido' });
+
+  // Proteger admins de modificación masiva
+  const { data: admins } = await supabase.from('usuario')
+    .select('id_usuario').in('id_usuario', ids).eq('rol', 'admin');
+  if (admins?.length > 0)
+    return res.status(403).json({ error: 'No se pueden modificar cuentas de administrador' });
+
+  if (action === 'activate') {
+    const { error } = await supabase.from('usuario')
+      .update({ activo: true, fecha_activacion: new Date().toISOString() })
+      .in('id_usuario', ids);
+    if (error) return res.status(500).json({ error: error.message });
+  } else if (action === 'deactivate') {
+    const { error } = await supabase.from('usuario')
+      .update({ activo: false }).in('id_usuario', ids);
+    if (error) return res.status(500).json({ error: error.message });
+  } else if (action === 'delete') {
+    const { error } = await supabase.from('usuario')
+      .delete().in('id_usuario', ids);
+    if (error) return res.status(500).json({ error: error.message });
+  }
+
+  res.json({
+    message: `${ids.length} usuario${ids.length !== 1 ? 's' : ''} ${action === 'activate' ? 'activados' : action === 'deactivate' ? 'desactivados' : 'eliminados'}`,
+    affected: ids.length,
+  });
 });
 
 app.patch('/api/admin/users/:id/toggle-active', requireAuth, requireAdmin, async (req, res) => {
@@ -136,7 +213,7 @@ app.patch('/api/admin/users/:id/toggle-active', requireAuth, requireAdmin, async
 app.patch('/api/admin/users/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
   const { new_password } = req.body;
   if (!new_password || new_password.length < 8) return res.status(400).json({ error: 'Mínimo 8 caracteres' });
-  await supabase.from('usuario').update({ password_hash: await bcrypt.hash(new_password, 10) }).eq('id_usuario', req.params.id);
+  await supabase.from('usuario').update({ password_hash: await bcrypt.hash(new_password, 8) }).eq('id_usuario', req.params.id);
   res.json({ message: 'Contraseña reseteada' });
 });
 
@@ -159,12 +236,10 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
 app.get('/api/admin/backup', requireAuth, requireAdmin, async (req, res) => {
   const tables = ['usuario', 'vehiculo', 'alerta', 'ruta', 'contacto_emergencia', 'configuracion_sistema'];
   const backup = { exportado_en: new Date().toISOString(), tablas: {} };
-
   for (const table of tables) {
     const { data } = await supabase.from(table).select('*');
     backup.tablas[table] = data || [];
   }
-
   const fecha = new Date().toISOString().split('T')[0];
   res.setHeader('Content-Disposition', `attachment; filename=motoguard_backup_${fecha}.json`);
   res.setHeader('Content-Type', 'application/json');
@@ -231,18 +306,16 @@ app.post('/api/alerts', requireAuth, async (req, res) => {
   const { id_vehiculo, tipo_incidencia, latitud, longitud } = req.body;
   if (!tipo_incidencia || latitud === undefined || longitud === undefined)
     return res.status(400).json({ error: 'Faltan campos' });
-
- // POST /api/alerts — nuevo estado: 'activo' en lugar de 'pendiente'
-const { data, error } = await supabase.from('alerta')
-  .insert([{ id_vehiculo, tipo_incidencia, latitud, longitud, estado_alerta: 'activo', id_usuario: req.user.id }])
-  .select().single();
+  const { data, error } = await supabase.from('alerta')
+    .insert([{ id_vehiculo, tipo_incidencia, latitud, longitud, estado_alerta: 'activo', id_usuario: req.user.id }])
+    .select().single();
   if (error) return res.status(500).json({ error: 'Error: ' + error.message });
   res.status(201).json(data);
 });
 
 app.patch('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
   const { estado_alerta } = req.body;
-  if (!['pendiente','activo','resuelto'].includes(estado_alerta))
+  if (!['activo','resuelto'].includes(estado_alerta))
     return res.status(400).json({ error: 'Estado inválido' });
   const { data, error } = await supabase.from('alerta')
     .update({ estado_alerta }).eq('id_alerta', req.params.id).select().single();
@@ -251,24 +324,22 @@ app.patch('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 app.delete('/api/alerts/:id', requireAuth, async (req, res) => {
-  console.log('DELETE ALERTS HIT - id:', req.params.id, 'user:', req.user.id, 'rol:', req.user.rol);
   if (req.user.rol === 'admin') {
     await supabase.from('alerta').delete().eq('id_alerta', req.params.id);
     return res.json({ message: 'Eliminado' });
   }
   const { error } = await supabase.from('alerta').delete()
-    .eq('id_alerta', req.params.id)
-    .eq('id_usuario', req.user.id);
+    .eq('id_alerta', req.params.id).eq('id_usuario', req.user.id);
   if (error) return res.status(500).json({ error: 'Error' });
   res.json({ message: 'Eliminado' });
 });
-// GET /api/heatmap — peso por tipo Y antigüedad
+
+/* ── HEATMAP ──────────────────────────────────────────────── */
 app.get('/api/heatmap', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('alerta')
-    .select('latitud, longitud, tipo_incidencia, estado_alerta, fecha_hora')
+    .select('latitud, longitud, tipo_incidencia, fecha_hora')
     .not('latitud', 'is', null).not('longitud', 'is', null)
-    .eq('estado_alerta', 'activo')  // solo activos en el heatmap
-    .limit(500);
+    .eq('estado_alerta', 'activo').limit(500);
   if (error) return res.status(500).json({ error: 'Error' });
 
   const ahora = Date.now();
@@ -276,19 +347,9 @@ app.get('/api/heatmap', requireAuth, async (req, res) => {
     const t = (a.tipo_incidencia || '').toLowerCase();
     const peso_tipo = t.includes('robo') || t.includes('emergencia') ? 1.0
                     : t.includes('sospech') || t.includes('accidente') ? 0.7 : 0.4;
-    
-    // Peso por antigüedad — más reciente = más peso
     const diasAtras = (ahora - new Date(a.fecha_hora).getTime()) / (1000 * 60 * 60 * 24);
-    const peso_tiempo = diasAtras <= 1 ? 1.0      // último día — máximo
-                      : diasAtras <= 7 ? 0.8      // última semana
-                      : diasAtras <= 30 ? 0.5     // último mes
-                      : 0.25;                      // más antiguo — mínimo
-
-    return {
-      lat: parseFloat(a.latitud),
-      lng: parseFloat(a.longitud),
-      weight: peso_tipo * peso_tiempo,
-    };
+    const peso_tiempo = diasAtras <= 1 ? 1.0 : diasAtras <= 7 ? 0.8 : diasAtras <= 30 ? 0.5 : 0.25;
+    return { lat: parseFloat(a.latitud), lng: parseFloat(a.longitud), weight: peso_tipo * peso_tiempo };
   }));
 });
 
@@ -335,43 +396,33 @@ app.delete('/api/emergency-contacts/:id', requireAuth, async (req, res) => {
 app.get('/api/config/:vehiculoId', requireAuth, async (req, res) => {
   const { data } = await supabase.from('configuracion_sistema')
     .select('*').eq('id_vehiculo', req.params.vehiculoId).single();
-  if (!data) {
-    return res.json({
-      id_vehiculo:         parseInt(req.params.vehiculoId),
-      modo_seguridad:      'armado',
-      umbral_apagado_ms:   10,
-      radio_proximidad_cm: 45,
-      alertas_movimiento:  true,
-      rastreo_continuo:    true,
-    });
-  }
+  if (!data) return res.json({
+    id_vehiculo: parseInt(req.params.vehiculoId),
+    modo_seguridad: 'armado', umbral_apagado_ms: 10,
+    radio_proximidad_cm: 45, alertas_movimiento: true, rastreo_continuo: true,
+  });
   res.json(data);
 });
 
 app.post('/api/config', requireAuth, async (req, res) => {
   const { id_vehiculo, modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento, rastreo_continuo } = req.body;
   if (!id_vehiculo) return res.status(400).json({ error: 'id_vehiculo requerido' });
-
   if (req.user.rol !== 'admin') {
     const { data: veh } = await supabase.from('vehiculo')
       .select('id_vehiculo').eq('id_vehiculo', id_vehiculo).eq('id_usuario', req.user.id).single();
     if (!veh) return res.status(403).json({ error: 'Sin permiso' });
   }
-
   const { data, error } = await supabase.from('configuracion_sistema')
     .upsert([{ id_vehiculo, modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento, rastreo_continuo }],
-      { onConflict: 'id_vehiculo' })
-    .select().single();
+      { onConflict: 'id_vehiculo' }).select().single();
   if (error) return res.status(500).json({ error: 'Error: ' + error.message });
   res.json(data);
 });
 
-/* ── IoT endpoint (preparado para anillo BLE) ─────────────── */
+/* ── IoT ──────────────────────────────────────────────────── */
 app.post('/api/iot/telemetry', async (req, res) => {
   const apiKey = req.headers['x-device-api-key'];
-  if (apiKey !== process.env.IOT_API_KEY)
-    return res.status(401).json({ error: 'API key inválida' });
-  // Se implementará cuando el hardware esté disponible
+  if (apiKey !== process.env.IOT_API_KEY) return res.status(401).json({ error: 'API key inválida' });
   res.status(202).json({ received: true });
 });
 

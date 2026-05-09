@@ -40,32 +40,40 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
   const [routes,  setRoutes]  = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ── GUARD: garantiza que siempre sean arrays ───────────────
+  const safeUsers  = Array.isArray(users)  ? users  : [];
+  const safeAlerts = Array.isArray(alerts) ? alerts : [];
+  const safeRoutes = Array.isArray(routes) ? routes : [];
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [u, a, r] = await Promise.all([
+        const [uRes, a, r] = await Promise.all([
           adminService.getAllUsers(),
           alertService.getAll(),
           routeService.getAll(),
         ]);
-        setUsers(u);
-        setAlerts(a.slice(0, 6));
-        setRoutes(r.slice(0, 4));
-      } catch {}
+        // Normalizar siempre a array — compatible con versión vieja y nueva del backend
+        const rawUsers = Array.isArray(uRes) ? uRes : (Array.isArray(uRes?.users) ? uRes.users : []);
+        setUsers(rawUsers);
+        setAlerts(Array.isArray(a) ? a.slice(0, 6) : []);
+        setRoutes(Array.isArray(r) ? r.slice(0, 4) : []);
+      } catch (e) { console.error(e); }
       setLoading(false);
     };
     load();
   }, []);
 
-  const pendingUsers = users.filter(u => !u.activo && u.rol !== 'admin');
-  const activeUsers  = users.filter(u => u.activo);
-  const pendingAlerts = alerts.filter(a => a.estado_alerta === 'pendiente').length;
+  const pendingUsers  = safeUsers.filter(u => !u.activo && u.rol !== 'admin');
+  const activeUsers   = safeUsers.filter(u => u.activo);
+  const pendingAlerts = safeAlerts.filter(a => a.estado_alerta === 'activo').length;
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
       <div style={{ textAlign: 'center' }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center', display: 'block', margin: '0 auto 10px' }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"
+          style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center', display: 'block', margin: '0 auto 10px' }}>
           <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
         </svg>
         <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.12em' }}>CARGANDO...</span>
@@ -89,13 +97,13 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
           </div>
           <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>PANEL DE CONTROL</h1>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>
-            {users.length} usuarios · {activeUsers.length} activos · {alerts.length} alertas
+            {safeUsers.length} usuarios · {activeUsers.length} activos · {safeAlerts.length} alertas
           </span>
         </div>
         <ThemeToggle compact />
       </div>
 
-      {/* Aviso pendientes — clickeable */}
+      {/* Aviso pendientes */}
       {pendingUsers.length > 0 && (
         <Card onClick={() => navigate('/users')} style={{ marginBottom: 20, background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', cursor: 'pointer' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -110,9 +118,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
                 </p>
               </div>
             </div>
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--amber)', letterSpacing: '0.1em' }}>
-              IR A USUARIOS →
-            </span>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--amber)', letterSpacing: '0.1em' }}>IR A USUARIOS →</span>
           </div>
         </Card>
       )}
@@ -120,12 +126,12 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'USUARIOS TOTAL',  value: users.length,         color: 'var(--text-primary)' },
-          { label: 'ACTIVOS',         value: activeUsers.length,   color: 'var(--green)' },
-          { label: 'PENDIENTES',      value: pendingCount,         color: pendingCount > 0 ? 'var(--amber)' : 'var(--text-muted)' },
-          { label: 'ALERTAS ACTIVAS', value: pendingAlerts,        color: pendingAlerts > 0 ? 'var(--accent)' : 'var(--green)' },
-          { label: 'RUTAS HOY',       value: routes.length,        color: 'var(--cyan)' },
-          { label: 'INCIDENCIAS',     value: alerts.length,        color: 'var(--text-primary)' },
+          { label: 'USUARIOS TOTAL',  value: safeUsers.length,  color: 'var(--text-primary)' },
+          { label: 'ACTIVOS',         value: activeUsers.length, color: 'var(--green)' },
+          { label: 'PENDIENTES',      value: pendingCount,       color: pendingCount > 0 ? 'var(--amber)' : 'var(--text-muted)' },
+          { label: 'ALERTAS ACTIVAS', value: pendingAlerts,      color: pendingAlerts > 0 ? 'var(--accent)' : 'var(--green)' },
+          { label: 'RUTAS HOY',       value: safeRoutes.length,  color: 'var(--cyan)' },
+          { label: 'INCIDENCIAS',     value: safeAlerts.length,  color: 'var(--text-primary)' },
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 16px' }}>
             <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{s.label}</span>
@@ -150,14 +156,15 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
           </div>
         </Card>
 
-        {/* Alertas reales */}
+        {/* Alertas */}
         <Card>
           <Label action="VER MAPA →" onAction={() => navigate('/map')}>ALERTAS RECIENTES</Label>
-          {alerts.length === 0 ? <Empty msg="Sin alertas registradas" /> : alerts.map((a, i) => {
-            const c = a.tipo_incidencia === 'Robo' ? 'var(--accent)' : a.tipo_incidencia === 'Movimiento' ? 'var(--amber)' : 'var(--green)';
+          {safeAlerts.length === 0 ? <Empty msg="Sin alertas registradas" /> : safeAlerts.map((a, i) => {
+            const t = (a.tipo_incidencia || '').toLowerCase();
+            const c = t.includes('robo') ? 'var(--accent)' : t.includes('movimiento') ? 'var(--amber)' : 'var(--green)';
             return (
-              <div key={a.id_alerta} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < alerts.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <Dot color={c} pulse={a.estado_alerta === 'pendiente'} size={6} />
+              <div key={a.id_alerta} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < safeAlerts.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <Dot color={c} size={6} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>{a.tipo_incidencia}</span>
@@ -172,11 +179,11 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
           })}
         </Card>
 
-        {/* Rutas reales */}
+        {/* Rutas */}
         <Card>
           <Label action="VER TODAS →" onAction={() => navigate('/routes')}>RUTAS RECIENTES</Label>
-          {routes.length === 0 ? <Empty msg="Sin rutas registradas" /> : routes.map((r, i) => (
-            <div key={r.id_ruta} style={{ padding: '9px 0', borderBottom: i < routes.length - 1 ? '1px solid var(--border)' : 'none' }}>
+          {safeRoutes.length === 0 ? <Empty msg="Sin rutas registradas" /> : safeRoutes.map((r, i) => (
+            <div key={r.id_ruta} style={{ padding: '9px 0', borderBottom: i < safeRoutes.length - 1 ? '1px solid var(--border)' : 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                 <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>
                   {r.fecha_inicio ? new Date(r.fecha_inicio).toLocaleDateString('es-PE') : '—'}
@@ -195,7 +202,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
           ))}
         </Card>
 
-        {/* Acciones rápidas admin */}
+        {/* Acciones rápidas */}
         <Card>
           <Label>ACCIONES RÁPIDAS</Label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -209,8 +216,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '11px 14px', borderRadius: 8, cursor: 'pointer',
                 background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                color, fontFamily: 'DM Sans', fontSize: 13, fontWeight: 500,
-                transition: 'all .2s',
+                color, fontFamily: 'DM Sans', fontSize: 13, fontWeight: 500, transition: 'all .2s',
               }}>
                 {label}
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
