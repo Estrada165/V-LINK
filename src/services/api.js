@@ -57,7 +57,8 @@ export const profileService = {
 
 /* ── VEHICLES ───────────────────────────────────────────────── */
 export const vehicleService = {
-  getAll:  ()         => api.get('/vehicles').then(r => r.data),
+  getAll:  ()         => api.get('/vehicles').then(r => r.data),      // admin: todos
+  getMine: ()         => api.get('/vehicles/mine').then(r => r.data), // siempre los propios
   create:  (payload)  => api.post('/vehicles', payload).then(r => r.data),
   update:  (id, data) => api.patch(`/vehicles/${id}`, data).then(r => r.data),
   delete:  (id)       => api.delete(`/vehicles/${id}`).then(r => r.data),

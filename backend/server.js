@@ -288,6 +288,14 @@ app.delete('/api/vehicles/:id', requireAuth, async (req, res) => {
   res.json({ message: 'Eliminado' });
 });
 
+// GET /api/vehicles/mine — siempre devuelve solo los del usuario autenticado
+app.get('/api/vehicles/mine', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('vehiculo')
+    .select('*').eq('id_usuario', req.user.id);
+  if (error) return res.status(500).json({ error: 'Error' });
+  res.json(data || []);
+});
+
 /* ── ALERTS ───────────────────────────────────────────────── */
 app.get('/api/alerts', requireAuth, async (req, res) => {
   let q = supabase.from('alerta').select('*').order('fecha_hora', { ascending: false }).limit(100);
@@ -424,6 +432,86 @@ app.post('/api/iot/telemetry', async (req, res) => {
   const apiKey = req.headers['x-device-api-key'];
   if (apiKey !== process.env.IOT_API_KEY) return res.status(401).json({ error: 'API key inválida' });
   res.status(202).json({ received: true });
+});
+// ── Agrega esta ruta en server.js antes del const PORT ────────
+
+// GET /api/admin/health — métricas reales del sistema
+app.get('/api/admin/health', requireAuth, requireAdmin, async (req, res) => {
+  const start = Date.now();
+
+  // 1. Ping a Supabase — mide latencia real de la BD
+  let dbLatency = null;
+  let dbOk = false;
+  try {
+    const t = Date.now();
+    const { error } = await supabase.from('usuario').select('id_usuario').limit(1);
+    dbLatency = Date.now() - t;
+    dbOk = !error;
+  } catch { dbOk = false; }
+
+  // 2. Memoria del proceso Node.js
+  const mem = process.memoryUsage();
+  const memUsedMB  = Math.round(mem.heapUsed  / 1024 / 1024);
+  const memTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
+  const memPct     = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+
+  // 3. Uptime del proceso
+  const uptimeSecs = Math.round(process.uptime());
+  const uptimeHrs  = Math.floor(uptimeSecs / 3600);
+  const uptimeMins = Math.floor((uptimeSecs % 3600) / 60);
+
+  // 4. Latencia del backend (tiempo que tardó en responder este endpoint)
+  const backendLatency = Date.now() - start;
+
+  // 5. Conteos reales de la BD
+  const [usersRes, alertsRes, vehiclesRes] = await Promise.all([
+    supabase.from('usuario').select('id_usuario, activo', { count: 'exact' }),
+    supabase.from('alerta').select('id_alerta', { count: 'exact' }),
+    supabase.from('vehiculo').select('id_vehiculo', { count: 'exact' }),
+  ]);
+
+  // 6. Calcular "salud" como porcentaje para las barras visuales
+  // DB health: basado en latencia (< 100ms = 95%, < 300ms = 70%, > 500ms = 40%)
+  const dbHealth = dbOk
+    ? dbLatency < 100 ? 95
+    : dbLatency < 300 ? 75
+    : dbLatency < 500 ? 55
+    : 35
+    : 0;
+
+  // Backend health: basado en latencia de respuesta
+  const backendHealth = backendLatency < 50  ? 98
+                      : backendLatency < 150 ? 85
+                      : backendLatency < 300 ? 65
+                      : 45;
+
+  res.json({
+    status: dbOk ? 'ok' : 'degraded',
+    backend: {
+      health:     backendHealth,
+      latency_ms: backendLatency,
+      uptime:     `${uptimeHrs}h ${uptimeMins}m`,
+      uptime_secs: uptimeSecs,
+      node_version: process.version,
+    },
+    database: {
+      health:     dbHealth,
+      latency_ms: dbLatency,
+      connected:  dbOk,
+      counts: {
+        usuarios:  usersRes.count  || 0,
+        alertas:   alertsRes.count || 0,
+        vehiculos: vehiclesRes.count || 0,
+      }
+    },
+    memory: {
+      health:    100 - memPct, // invertido: menos uso = más salud
+      used_mb:   memUsedMB,
+      total_mb:  memTotalMB,
+      percent:   memPct,
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 const PORT = process.env.PORT || 4000;

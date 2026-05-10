@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import AnimatedRing from '../components/ring/AnimatedRing';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import { vehicleService, configService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-/* ── Atoms ──────────────────────────────────────────────────── */
 const Card = ({ children, style = {} }) => (
   <div className="mg-card" style={{ padding: '18px 20px', ...style }}>{children}</div>
 );
@@ -52,13 +52,11 @@ const SaveBtn = ({ onSave, saved, loading: l, label = 'GUARDAR' }) => (
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
 
-  // Vehicles
-  const [vehicles,     setVehicles]     = useState([]);
-  const [selectedVeh,  setSelectedVeh]  = useState(null);  // vehicle object
-  const [loadingVehs,  setLoadingVehs]  = useState(true);
-
-  // Config per vehicle
+  const [vehicles,    setVehicles]    = useState([]);
+  const [selectedVeh, setSelectedVeh] = useState(null);
+  const [loadingVehs, setLoadingVehs] = useState(true);
   const [ringMode,    setRingMode]    = useState('armed');
   const [threshold,   setThreshold]   = useState(10);
   const [proximity,   setProximity]   = useState(45);
@@ -67,10 +65,8 @@ export default function Settings() {
   const [gps,         setGps]         = useState(true);
   const [savedConfig, setSavedConfig] = useState(false);
   const [loadingCfg,  setLoadingCfg]  = useState(false);
-
-  // BLE
-  const [bleState, setBleState] = useState('disconnected');
-  const [testing,  setTesting]  = useState(false);
+  const [bleState,    setBleState]    = useState('disconnected');
+  const [testing,     setTesting]     = useState(false);
 
   const ringModes = [
     { key: 'armed',     label: 'Armado',     hex: 'var(--accent)' },
@@ -84,9 +80,9 @@ export default function Settings() {
     const load = async () => {
       setLoadingVehs(true);
       try {
-        const vehs = await vehicleService.getAll();
-        setVehicles(vehs);
-        if (vehs.length > 0) setSelectedVeh(vehs[0]);
+        const vehs = await vehicleService.getMine();
+        setVehicles(vehs || []);
+        if (vehs?.length > 0) setSelectedVeh(vehs[0]);
       } catch (e) { console.error(e); }
       setLoadingVehs(false);
     };
@@ -97,7 +93,6 @@ export default function Settings() {
   useEffect(() => {
     if (!selectedVeh) return;
     const loadConfig = async () => {
-      // Reset to defaults first
       setRingMode('armed'); setThreshold(10); setProximity(45);
       setBrightness(70); setAlerts(true); setGps(true);
       try {
@@ -110,7 +105,7 @@ export default function Settings() {
         if (cfg.radio_proximidad_cm)  setProximity(cfg.radio_proximidad_cm);
         if (cfg.alertas_movimiento !== undefined) setAlerts(cfg.alertas_movimiento);
         if (cfg.rastreo_continuo !== undefined)   setGps(cfg.rastreo_continuo);
-      } catch { /* sin config aún para este vehículo */ }
+      } catch {}
     };
     loadConfig();
   }, [selectedVeh]);
@@ -135,7 +130,7 @@ export default function Settings() {
     setLoadingCfg(false);
   };
 
-  /* ── BLE connect ──────────────────────────────────────────── */
+  /* ── BLE ──────────────────────────────────────────────────── */
   const handleBle = () => {
     if (bleState === 'connected') { setBleState('disconnected'); return; }
     setBleState('scanning');
@@ -151,8 +146,8 @@ export default function Settings() {
     }
   };
 
-  /* ── No vehicles ──────────────────────────────────────────── */
-  if (!loadingVehs && vehicles.length === 0) {
+  /* ── Sin vehículo — solo bloquea a usuarios normales ─────── */
+  if (!loadingVehs && vehicles.length === 0 && !isAdmin) {
     return (
       <div style={{ padding: '24px 28px' }}>
         <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1, marginBottom: 20 }}>AJUSTES</h1>
@@ -164,9 +159,7 @@ export default function Settings() {
           <button onClick={() => navigate('/profile')} style={{
             padding: '10px 18px', background: 'var(--accent)', border: 'none', borderRadius: 8,
             cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.1em', color: '#fff',
-          }}>
-            IR A MI PERFIL →
-          </button>
+          }}>IR A MI PERFIL →</button>
         </Card>
       </div>
     );
@@ -175,18 +168,18 @@ export default function Settings() {
   return (
     <div style={{ padding: '24px 28px' }} className="anim-fade">
 
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
           <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>AJUSTES</h1>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>
-            Configuración del dispositivo IoT
+            {selectedVeh ? `${selectedVeh.marca} ${selectedVeh.modelo} · ${selectedVeh.placa}` : 'Configuración del dispositivo IoT'}
           </span>
         </div>
         <ThemeToggle compact />
       </div>
 
-      {/* ── Vehicle selector ────────────────────────────────────── */}
+      {/* Vehicle selector */}
       {vehicles.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <Label>SELECCIONAR VEHÍCULO</Label>
@@ -221,62 +214,75 @@ export default function Settings() {
         </div>
       )}
 
-      {/* ── Config content ─────────────────────────────────────── */}
-      {selectedVeh && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+      {/* Admin sin vehículo — aviso informativo */}
+      {isAdmin && vehicles.length === 0 && (
+        <Card style={{ marginBottom: 20, background: 'var(--cyan-soft)', border: '1px solid var(--cyan-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="1.8">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--cyan)', letterSpacing: '0.07em' }}>
+              No tienes vehículos registrados. Puedes configurar BLE, notificaciones y apariencia desde aquí.
+            </p>
+          </div>
+        </Card>
+      )}
 
-          {/* LEFT */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Config grid — admin siempre lo ve, usuario solo si tiene vehículo */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
 
-            {/* BLE */}
-            <Card>
-              <Label>CONEXIÓN BLUETOOTH LE</Label>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-                    {bleState === 'connected' ? `${selectedVeh.marca} ${selectedVeh.modelo}` : bleState === 'scanning' ? 'Buscando...' : 'Sin anillo vinculado'}
-                  </p>
-                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
-                    {bleState === 'connected' ? 'MG-RING · BLE 5.0' : 'El anillo físico debe estar encendido'}
-                  </p>
-                </div>
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
-                  stroke={bleState === 'connected' ? 'var(--cyan)' : 'var(--text-muted)'}
-                  strokeWidth="1.5" style={{ transition: 'stroke .4s', flexShrink: 0 }}>
-                  <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
-                </svg>
+        {/* LEFT */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* BLE */}
+          <Card>
+            <Label>CONEXIÓN BLUETOOTH LE</Label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
+                  {bleState === 'connected' ? (selectedVeh ? `${selectedVeh.marca} ${selectedVeh.modelo}` : 'Anillo conectado')
+                    : bleState === 'scanning' ? 'Buscando...' : 'Sin anillo vinculado'}
+                </p>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+                  {bleState === 'connected' ? 'MG-RING · BLE 5.0' : 'El anillo físico debe estar encendido'}
+                </p>
               </div>
-
-              {bleState === 'scanning' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', background: 'var(--cyan-soft)', border: '1px solid var(--cyan-border)', borderRadius: 8 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="2" style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center' }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                  </svg>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--cyan)', letterSpacing: '0.1em' }}>ESCANEANDO BLE...</span>
-                </div>
-              )}
-
-              <button onClick={handleBle} style={{
-                width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                fontFamily: 'JetBrains Mono', fontSize: 11, letterSpacing: '0.12em', transition: 'all .25s',
-                background: bleState === 'connected' ? 'var(--accent-soft)' : 'var(--cyan-soft)',
-                border: `1px solid ${bleState === 'connected' ? 'var(--accent-border)' : 'var(--cyan-border)'}`,
-                color: bleState === 'connected' ? 'var(--accent)' : 'var(--cyan)',
-              }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  {bleState === 'connected'
-                    ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
-                    : <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>}
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+                stroke={bleState === 'connected' ? 'var(--cyan)' : 'var(--text-muted)'}
+                strokeWidth="1.5" style={{ transition: 'stroke .4s', flexShrink: 0 }}>
+                <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
+              </svg>
+            </div>
+            {bleState === 'scanning' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', background: 'var(--cyan-soft)', border: '1px solid var(--cyan-border)', borderRadius: 8 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="2" style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center' }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                 </svg>
-                {bleState === 'connected' ? 'DESCONECTAR ANILLO' : bleState === 'scanning' ? 'BUSCANDO...' : 'CONECTAR ANILLO BLE'}
-              </button>
-              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', marginTop: 8, textAlign: 'center', letterSpacing: '0.06em' }}>
-                Requiere Chrome · Hardware BLE pendiente de fabricación
-              </p>
-            </Card>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--cyan)', letterSpacing: '0.1em' }}>ESCANEANDO BLE...</span>
+              </div>
+            )}
+            <button onClick={handleBle} style={{
+              width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              fontFamily: 'JetBrains Mono', fontSize: 11, letterSpacing: '0.12em', transition: 'all .25s',
+              background: bleState === 'connected' ? 'var(--accent-soft)' : 'var(--cyan-soft)',
+              border: `1px solid ${bleState === 'connected' ? 'var(--accent-border)' : 'var(--cyan-border)'}`,
+              color: bleState === 'connected' ? 'var(--accent)' : 'var(--cyan)',
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                {bleState === 'connected'
+                  ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+                  : <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>}
+              </svg>
+              {bleState === 'connected' ? 'DESCONECTAR ANILLO' : bleState === 'scanning' ? 'BUSCANDO...' : 'CONECTAR ANILLO BLE'}
+            </button>
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', marginTop: 8, textAlign: 'center' }}>
+              Requiere Chrome · Hardware BLE pendiente de fabricación
+            </p>
+          </Card>
 
-            {/* Ring preview */}
+          {/* Ring preview — solo si hay vehículo seleccionado */}
+          {selectedVeh && (
             <Card>
               <Label>MODO ACTUAL — {selectedVeh.marca} {selectedVeh.modelo}</Label>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
@@ -289,46 +295,45 @@ export default function Settings() {
                       background: ringMode === m.key ? 'var(--accent-soft)' : 'var(--bg-surface)',
                       border: `1px solid ${ringMode === m.key ? 'var(--accent-border)' : 'var(--border)'}`,
                       color: ringMode === m.key ? m.hex : 'var(--text-muted)',
-                    }}>
-                      {m.label.toUpperCase()}
-                    </button>
+                    }}>{m.label.toUpperCase()}</button>
                   ))}
                 </div>
               </div>
             </Card>
+          )}
 
-            {/* Connection test */}
-            <Card>
-              <Label>ESTADO DEL SISTEMA</Label>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div className="anim-blink" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--green)', letterSpacing: '0.1em' }}>BACKEND EN LÍNEA</span>
-                </div>
-                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-faint)' }}>v2.4.1</span>
+          {/* Estado del sistema */}
+          <Card>
+            <Label>ESTADO DEL SISTEMA</Label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="anim-blink" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--green)', letterSpacing: '0.1em' }}>BACKEND EN LÍNEA</span>
               </div>
-              <button onClick={() => { setTesting(true); setTimeout(() => setTesting(false), 2000); }} style={{
-                width: '100%', padding: '11px', borderRadius: 10, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                fontFamily: 'JetBrains Mono', fontSize: 11, letterSpacing: '0.12em', transition: 'all .25s',
-                background: testing ? 'var(--green-soft)' : 'var(--bg-surface)',
-                border: `1px solid ${testing ? 'var(--green-border)' : 'var(--border)'}`,
-                color: testing ? 'var(--green)' : 'var(--text-secondary)',
-              }}>
-                {testing
-                  ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>PROBANDO...</>
-                  : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>PRUEBA DE CONEXIÓN</>}
-              </button>
-            </Card>
-          </div>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-faint)' }}>v2.4.1</span>
+            </div>
+            <button onClick={() => { setTesting(true); setTimeout(() => setTesting(false), 2000); }} style={{
+              width: '100%', padding: '11px', borderRadius: 10, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              fontFamily: 'JetBrains Mono', fontSize: 11, letterSpacing: '0.12em', transition: 'all .25s',
+              background: testing ? 'var(--green-soft)' : 'var(--bg-surface)',
+              border: `1px solid ${testing ? 'var(--green-border)' : 'var(--border)'}`,
+              color: testing ? 'var(--green)' : 'var(--text-secondary)',
+            }}>
+              {testing
+                ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin-cw 1s linear infinite', transformOrigin: 'center' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>PROBANDO...</>
+                : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>PRUEBA DE CONEXIÓN</>}
+            </button>
+          </Card>
+        </div>
 
-          {/* RIGHT */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* RIGHT */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-            {/* Sensor calibration */}
+          {/* Sensor calibration — solo si hay vehículo */}
+          {selectedVeh && (
             <Card>
               <Label>CALIBRACIÓN DE SENSORES</Label>
-
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div>
@@ -339,9 +344,7 @@ export default function Settings() {
                 </div>
                 <Slider value={threshold} onChange={setThreshold} min={1} max={50} unit=" ms" />
               </div>
-
               <Divider />
-
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div>
@@ -352,9 +355,7 @@ export default function Settings() {
                 </div>
                 <Slider value={proximity} onChange={setProximity} min={10} max={150} unit=" cm" />
               </div>
-
               <Divider />
-
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Brillo del anillo LED</p>
@@ -363,37 +364,39 @@ export default function Settings() {
                 <Slider value={brightness} onChange={setBrightness} min={10} max={100} unit="%" />
               </div>
             </Card>
+          )}
 
-            {/* Notifications */}
-            <Card>
-              <Label>NOTIFICACIONES</Label>
-              {[
-                { label: 'Alertas de movimiento', sub: 'Vibración o desplazamiento detectado', val: alerts, set: setAlerts, color: 'var(--accent)' },
-                { label: 'Rastreo GPS continuo',  sub: 'Actualización de ubicación cada 5s',   val: gps,    set: setGps,    color: 'var(--green)' },
-              ].map((item, i, arr) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{item.label}</p>
-                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>{item.sub}</p>
-                  </div>
-                  <Toggle value={item.val} onChange={item.set} color={item.color} />
-                </div>
-              ))}
-            </Card>
-
-            {/* Appearance */}
-            <Card>
-              <Label>APARIENCIA</Label>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Notificaciones */}
+          <Card>
+            <Label>NOTIFICACIONES</Label>
+            {[
+              { label: 'Alertas de movimiento', sub: 'Vibración o desplazamiento detectado', val: alerts, set: setAlerts, color: 'var(--accent)' },
+              { label: 'Rastreo GPS continuo',  sub: 'Actualización de ubicación cada 5s',   val: gps,    set: setGps,    color: 'var(--green)' },
+            ].map((item, i, arr) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Tema de la interfaz</p>
-                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>Oscuro recomendado para uso nocturno</p>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{item.label}</p>
+                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>{item.sub}</p>
                 </div>
-                <ThemeToggle />
+                <Toggle value={item.val} onChange={item.set} color={item.color} />
               </div>
-            </Card>
+            ))}
+          </Card>
 
-            {/* Device info */}
+          {/* Apariencia */}
+          <Card>
+            <Label>APARIENCIA</Label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Tema de la interfaz</p>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>Oscuro recomendado para uso nocturno</p>
+              </div>
+              <ThemeToggle />
+            </div>
+          </Card>
+
+          {/* Info del vehículo o del sistema */}
+          {selectedVeh ? (
             <Card>
               <Label>DATOS DEL VEHÍCULO SELECCIONADO</Label>
               {[
@@ -405,16 +408,35 @@ export default function Settings() {
                 ['BLE Hardware',   'Pendiente de fabricación'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>{k}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>{k}</span>
                   <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>{v}</span>
                 </div>
               ))}
             </Card>
+          ) : isAdmin && (
+            <Card>
+              <Label>INFORMACIÓN DEL SISTEMA</Label>
+              {[
+                ['Versión',        'v2.4.1'],
+                ['Backend',        'Railway · Node.js 20'],
+                ['Base de datos',  'Supabase PostgreSQL'],
+                ['Frontend',       'Vercel · React'],
+                ['BLE Hardware',   'Pendiente de fabricación'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>{k}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-secondary)' }}>{v}</span>
+                </div>
+              ))}
+            </Card>
+          )}
 
+          {/* Guardar — solo si hay vehículo */}
+          {selectedVeh && (
             <SaveBtn onSave={handleSaveConfig} saved={savedConfig} loading={loadingCfg} label="GUARDAR CONFIGURACIÓN" />
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -98,7 +98,7 @@ export default function Profile() {
   }, [currentUser]);
 
   const loadVehicles = async () => {
-    try { setVehicles(await vehicleService.getAll()); } catch {}
+    try { setVehicles(await vehicleService.getMine()); } catch {}
   };
   const loadContacts = async () => {
     try { setContacts(await contactService.getAll()); } catch {}
