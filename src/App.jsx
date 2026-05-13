@@ -10,6 +10,7 @@ import RoutesPage     from './pages/Routes';
 import Settings       from './pages/Settings';
 import Profile        from './pages/Profile';
 import UsersAdmin     from './pages/UsersAdmin';
+import NotFound from './pages/NotFound';
 
 /* ── Icons ──────────────────────────────────────────────────── */
 const IC = {
@@ -287,20 +288,20 @@ function DashboardWrapper() {
 export default function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper /></ProtectedRoute>} />
-            <Route path="/users"     element={<ProtectedRoute adminOnly><AppLayout pendingCount={0}><UsersAdmin /></AppLayout></ProtectedRoute>} />
-            <Route path="/map"       element={<ProtectedRoute><AppLayout pendingCount={0}><MapPage /></AppLayout></ProtectedRoute>} />
-            <Route path="/routes"    element={<ProtectedRoute><AppLayout pendingCount={0}><RoutesPage /></AppLayout></ProtectedRoute>} />
-            <Route path="/settings"  element={<ProtectedRoute><AppLayout pendingCount={0}><Settings /></AppLayout></ProtectedRoute>} />
-            <Route path="/profile"   element={<ProtectedRoute><AppLayout pendingCount={0}><Profile /></AppLayout></ProtectedRoute>} />
-            <Route path="*"          element={<Navigate to="/" />} />
-          </Routes>
-        </BrowserRouter>
-      </ThemeProvider>
-    </AuthProvider>
+  <ThemeProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper /></ProtectedRoute>} />
+        <Route path="/users"     element={<ProtectedRoute adminOnly><AppLayout pendingCount={0}><UsersAdmin /></AppLayout></ProtectedRoute>} />
+        <Route path="/map"       element={<ProtectedRoute><AppLayout pendingCount={0}><MapPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/routes"    element={<ProtectedRoute><AppLayout pendingCount={0}><RoutesPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/settings"  element={<ProtectedRoute><AppLayout pendingCount={0}><Settings /></AppLayout></ProtectedRoute>} />
+        <Route path="/profile"   element={<ProtectedRoute><AppLayout pendingCount={0}><Profile /></AppLayout></ProtectedRoute>} />
+        <Route path="*"          element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  </ThemeProvider>
+</AuthProvider>
   );
 }
