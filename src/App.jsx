@@ -246,19 +246,22 @@ function NavMovil() {
   const location = useLocation();
   const navigate = useNavigate();
   const rol   = currentUser?.rol || 'usuario';
-  const items = (NAV_POR_ROL[rol] || NAV_POR_ROL.usuario).slice(0, 5);
+  const items = NAV_POR_ROL[rol] || NAV_POR_ROL.usuario;
 
   return (
-    <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50, background: 'var(--nav-bg)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-around', padding: '8px 0 10px' }}>
-      {items.map(({ ruta, etiqueta, Icono }) => {
-        const activo = location.pathname === ruta;
-        return (
-          <button key={ruta} onClick={() => navigate(ruta)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', color: activo ? 'var(--accent)' : 'var(--text-muted)', padding: '4px 8px', borderRadius: 8, minWidth: 44 }}>
-            <Icono />
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 7, letterSpacing: '0.06em' }}>{etiqueta}</span>
-          </button>
-        );
-      })}
+    <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50, background: 'var(--nav-bg)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--border)', padding: '6px 0 10px' }}>
+      <style>{`.mg-nav-scroll::-webkit-scrollbar{display:none}`}</style>
+      <div className="mg-nav-scroll" style={{ display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', paddingLeft: 8, paddingRight: 8 }}>
+        {items.map(({ ruta, etiqueta, Icono }) => {
+          const activo = location.pathname === ruta;
+          return (
+            <button key={ruta} onClick={() => navigate(ruta)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', color: activo ? 'var(--accent)' : 'var(--text-muted)', padding: '4px 10px', borderRadius: 8, flexShrink: 0, minWidth: 56 }}>
+              <Icono />
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 7, letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{etiqueta}</span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }
