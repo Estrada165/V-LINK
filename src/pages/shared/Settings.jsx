@@ -292,8 +292,6 @@ function SettingsUsuario() {
     { key: 'emergency', label: 'Emergencia', hex: '#ff2222'           },
   ];
 
-  const mapaModoBD = MAPA_MODO_BD;
-  const mapaModoUI = MAPA_MODO_UI;
 
   useEffect(() => {
     const cargar = async () => {

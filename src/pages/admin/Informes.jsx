@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
-import { informesService } from '../../services/api';
 import { fmtDateTime, fmtDate } from '../../utils/dateUtils';
 import Portal from '../../components/ui/Portal';
 import { useAuth } from '../../context/AuthContext';
@@ -134,7 +133,6 @@ export default function Informes() {
 
   const safeInformes = Array.isArray(informes) ? informes : [];
 
-  // Supervisores únicos para filtro
   const supervisores = [...new Map(safeInformes.map(i => [i.id_autor, i.usuario])).entries()]
     .map(([id, u]) => ({ id, nombre: u?.nombre_completo || `Supervisor ${id}` }));
 
