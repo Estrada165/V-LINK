@@ -216,9 +216,7 @@ input[type="range"] {
   accent-color: var(--accent);
   cursor: pointer;
 }
-/* ── RESPONSIVE & LEGIBILIDAD MÓVIL ─────────────────────── */
 
-/* Tamaños base más legibles */
 :root {
   --font-label: 10px;
   --font-mono-sm: 11px;
@@ -237,27 +235,22 @@ input[type="range"] {
     --font-body-lg: 16px;
   }
 
-  /* Evita zoom automático en iOS al enfocar inputs */
   input, textarea, select {
     font-size: 16px !important;
   }
 
-  /* Botones táctiles mínimo 44px */
   button {
     min-height: var(--touch-min);
   }
 
-  /* Padding de páginas más compacto en móvil */
   .anim-fade {
     padding: 14px 16px !important;
   }
 
-  /* Cards sin bordes redondeados exagerados en móvil */
   .mg-card {
     border-radius: 10px !important;
   }
 
-  /* Tablas scrolleables horizontalmente */
   table {
     font-size: 13px !important;
     display: block;
@@ -265,13 +258,11 @@ input[type="range"] {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Títulos display más pequeños en móvil */
   .display {
     font-size: 24px !important;
   }
 }
 
-/* Pantallas muy pequeñas (< 380px, ej. iPhone SE) */
 @media (max-width: 380px) {
   :root {
     --font-label: 12px;
@@ -284,12 +275,72 @@ input[type="range"] {
   }
 }
 
-/* Mejora legibilidad general — fuente mínima visible */
 [class*="mono"], [style*="JetBrains"] {
   -webkit-text-size-adjust: 100%;
 }
 
-/* Scrollbar en móvil invisible pero funcional */
 @media (max-width: 768px) {
   ::-webkit-scrollbar { width: 0px; height: 0px; }
+}
+:root {
+  --fz-label:  11px;   
+  --fz-mono:   12px;   
+  --fz-body:   14px;   
+  --fz-title:  15px;  
+}
+
+.mg-card span[style*="font-size: 7"],
+.mg-card span[style*="font-size: 8"],
+.mg-card span[style*="font-size: 9"] {
+  font-size: 11px !important;
+}
+
+.mg-card p[style*="font-size: 9"],
+.mg-card p[style*="font-size: 10"] {
+  font-size: 12px !important;
+}
+
+table { font-size: 13px; }
+th    { font-size: 10px !important; }
+td    { font-size: 12px !important; }
+
+[style*="JetBrains Mono"][style*="font-size: 7"],
+[style*="JetBrains Mono"][style*="font-size: 8"] {
+  font-size: 10px !important;
+}
+[style*="JetBrains Mono"][style*="font-size: 9"],
+[style*="JetBrains Mono"][style*="font-size: 10"] {
+  font-size: 11px !important;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --fz-label: 12px;
+    --fz-mono:  13px;
+    --fz-body:  15px;
+  }
+
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  button { min-height: 44px; }
+
+  .anim-fade { padding: 14px 16px !important; }
+
+  .display { font-size: 26px !important; }
+
+  .mg-card { border-radius: 10px !important; }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 13px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .anim-fade { padding: 10px 12px !important; }
+  .display { font-size: 22px !important; }
 }

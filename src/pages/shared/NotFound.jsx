@@ -10,7 +10,6 @@ export default function NotFound() {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'var(--bg-base)', padding: 24, flexDirection: 'column', gap: 0,
     }}>
-      {/* Logo */}
       <svg viewBox="0 0 64 64" width="52" height="52" style={{ marginBottom: 24, opacity: 0.4 }}>
         <polygon points="32,4 60,18 60,46 32,60 4,46 4,18" fill="rgba(224,48,48,0.12)" stroke="#e03030" strokeWidth="1.5"/>
         <polygon points="32,12 52,22 52,42 32,52 12,42 12,22" fill="none" stroke="#e03030" strokeWidth="0.5" opacity="0.4"/>
@@ -21,7 +20,6 @@ export default function NotFound() {
         <path d="M30 42L38 42" stroke="#e03030" strokeWidth="1" strokeLinecap="round"/>
       </svg>
 
-      {/* Código */}
       <p style={{
         fontFamily: 'Bebas Neue', fontSize: 96, color: 'var(--accent)',
         letterSpacing: '0.08em', lineHeight: 1, marginBottom: 8,
@@ -44,10 +42,9 @@ export default function NotFound() {
         fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-faint)',
         marginBottom: 32, letterSpacing: '0.04em',
       }}>
-        MOTOGUARD v2.4.1 · Sistema de Seguridad Vehicular
+        MOTOGUARD Sistema de Seguridad Vehicular
       </p>
 
-      {/* Acciones */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button onClick={() => navigate(-1)} style={{
           display: 'flex', alignItems: 'center', gap: 8,
@@ -78,7 +75,6 @@ export default function NotFound() {
         </button>
       </div>
 
-      {/* Línea decorativa */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, height: 2,
         background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',

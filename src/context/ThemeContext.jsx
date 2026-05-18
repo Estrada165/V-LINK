@@ -3,13 +3,16 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const ThemeContext = createContext({ isDark: true, toggle: () => {} });
 
 export const ThemeProvider = ({ children }) => {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    const guardado = localStorage.getItem('mg_theme');
+    return guardado ? guardado === 'dark' : true;
+  });
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    // also set class for any tailwind dark: utilities
-    root.classList.toggle('dark', isDark);
+    const raiz = document.documentElement;
+    raiz.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    raiz.classList.toggle('dark', isDark);
+    localStorage.setItem('mg_theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
   const toggle = () => setIsDark(prev => !prev);

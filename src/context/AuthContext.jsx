@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService, profileService } from '../services/api';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -7,33 +8,33 @@ export const AuthProvider = ({ children }) => {
   const [loading,     setLoading]     = useState(true);
   const [isOnline,    setIsOnline]    = useState(true);
 
-  // Al montar: restaurar sesión guardada en localStorage
   useEffect(() => {
-    const init = async () => {
-      const savedUser = authService.getCurrentUser();
-      if (savedUser) {
-        setCurrentUser(savedUser);
-        // Intentar refrescar desde la BD
+    const restaurarSesion = async () => {
+      const usuarioGuardado = authService.getCurrentUser();
+
+      if (usuarioGuardado) {
+        setCurrentUser(usuarioGuardado);
         try {
-          const fresh = await profileService.getMe();
-          setCurrentUser(fresh);
-          localStorage.setItem('mg_user', JSON.stringify(fresh));
-        } catch {
-          // Si falla (offline o token expirado), usar datos guardados
-        }
+          const usuarioActualizado = await profileService.getMe();
+          setCurrentUser(usuarioActualizado);
+          localStorage.setItem('mg_user', JSON.stringify(usuarioActualizado));
+        } catch {}
       }
+
       setLoading(false);
     };
-    init();
 
-    // Detectar conectividad del navegador
-    const goOnline  = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener('online',  goOnline);
-    window.addEventListener('offline', goOffline);
+    restaurarSesion();
+
+    const marcarEnLinea   = () => setIsOnline(true);
+    const marcarSinLinea  = () => setIsOnline(false);
+
+    window.addEventListener('online',  marcarEnLinea);
+    window.addEventListener('offline', marcarSinLinea);
+
     return () => {
-      window.removeEventListener('online',  goOnline);
-      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online',  marcarEnLinea);
+      window.removeEventListener('offline', marcarSinLinea);
     };
   }, []);
 
@@ -49,10 +50,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfile = async (payload) => {
-    const updated = await profileService.update(payload);
-    setCurrentUser(updated);
-    localStorage.setItem('mg_user', JSON.stringify(updated));
-    return updated;
+    const actualizado = await profileService.update(payload);
+    setCurrentUser(actualizado);
+    localStorage.setItem('mg_user', JSON.stringify(actualizado));
+    return actualizado;
   };
 
   return (
@@ -60,7 +61,9 @@ export const AuthProvider = ({ children }) => {
       currentUser,
       loading,
       isOnline,
-      isAdmin: currentUser?.rol === 'admin',
+      isAdmin:      currentUser?.rol === 'admin',
+      isSupervisor: currentUser?.rol === 'supervisor',
+      isTecnico:    currentUser?.rol === 'tecnico',
       login,
       logout,
       updateProfile,
