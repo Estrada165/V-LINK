@@ -1038,10 +1038,8 @@ app.patch('/api/tickets/:id/estado', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'El técnico solo puede marcar en proceso o resuelto' });
 
   const camposActualizar = { estado };
-  if (notas_tecnico)              camposActualizar.notas_tecnico    = notas_tecnico;
-  if (estado === 'resuelto')      camposActualizar.fecha_resolucion = new Date().toISOString();
-  if (estado === 'en_proceso' && !ticket.fecha_asignacion)
-    camposActualizar.fecha_asignacion = new Date().toISOString();
+  if (notas_tecnico)         camposActualizar.notas_tecnico    = notas_tecnico;
+  if (estado === 'resuelto') camposActualizar.fecha_resolucion = new Date().toISOString();
 
   const { data, error } = await supabase
     .from('ticket_soporte')

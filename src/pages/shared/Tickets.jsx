@@ -305,10 +305,23 @@ function ModalDetalle({ ticket, puedeAsignar, tecnicos, onClose, onActualizado }
             )}
 
             {puedeAsignar && (
-              <button onClick={() => setMostrarAsignar(true)} disabled={yaAsignado}
-                style={{ width: '100%', padding: '11px', borderRadius: 9, cursor: yaAsignado ? 'not-allowed' : 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.08em', background: yaAsignado ? 'var(--bg-surface)' : 'var(--amber-soft)', border: `1px solid ${yaAsignado ? 'var(--border)' : 'var(--amber-border)'}`, color: yaAsignado ? 'var(--text-faint)' : 'var(--amber)' }}>
-                {yaAsignado ? 'TICKET EN CURSO — no se puede reasignar' : 'ASIGNAR A TÉCNICO →'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {ticket.estado === 'resuelto' ? (
+                  <button onClick={async () => {
+                    try {
+                      await ticketService.estado(ticket.id_ticket, { estado: 'cerrado' });
+                      onActualizado(); onClose();
+                    } catch {}
+                  }} style={{ width: '100%', padding: '11px', borderRadius: 9, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.08em', background: 'var(--green-soft)', border: '1px solid var(--green-border)', color: 'var(--green)' }}>
+                    CONFIRMAR Y CERRAR TICKET →
+                  </button>
+                ) : (
+                  <button onClick={() => setMostrarAsignar(true)} disabled={yaAsignado}
+                    style={{ width: '100%', padding: '11px', borderRadius: 9, cursor: yaAsignado ? 'not-allowed' : 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.08em', background: yaAsignado ? 'var(--bg-surface)' : 'var(--amber-soft)', border: `1px solid ${yaAsignado ? 'var(--border)' : 'var(--amber-border)'}`, color: yaAsignado ? 'var(--text-faint)' : 'var(--amber)' }}>
+                    {yaAsignado ? 'TICKET EN CURSO — no se puede reasignar' : 'ASIGNAR A TÉCNICO →'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
