@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
-import { adminService } from '../../services/api';
+import { informesService } from '../../services/api';
 import { fmtDateTime, fmtDate } from '../../utils/dateUtils';
+import Portal from '../../components/ui/Portal';
+import { useAuth } from '../../context/AuthContext';
 
-const Card = ({ children, style = {} }) => (
-  <div className="mg-card" style={{ padding: '16px 18px', ...style }}>{children}</div>
-);
-const Label = ({ children }) => (
-  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-muted)', marginBottom: 12 }}>{children}</p>
+const Card = ({ children, style = {}, onClick }) => (
+  <div className="mg-card" onClick={onClick} style={{ padding: '16px 18px', ...style }}>{children}</div>
 );
 
 const ESTADO_CFG = {
@@ -16,7 +15,7 @@ const ESTADO_CFG = {
   archivado: { color: 'var(--text-muted)', bg: 'var(--bg-surface)', border: 'var(--border)', label: 'ARCHIVADO' },
 };
 
-function InformeModal({ informe, onClose, onEstadoChange }) {
+function InformeModal({ informe, onClose, onEstadoChange, soloLectura = false }) {
   const [loading, setLoading] = useState(false);
   const ec = ESTADO_CFG[informe.estado] || ESTADO_CFG.enviado;
 
@@ -30,7 +29,8 @@ function InformeModal({ informe, onClose, onEstadoChange }) {
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <Portal>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 580, maxHeight: '88vh', background: 'var(--bg-card)', border: '1px solid var(--border-mid)', borderRadius: 14, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
 
         <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
@@ -85,12 +85,12 @@ function InformeModal({ informe, onClose, onEstadoChange }) {
         </div>
 
         <div style={{ padding: '14px 24px 20px', flexShrink: 0, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {informe.estado === 'enviado' && (
+          {!soloLectura && informe.estado === 'enviado' && (
             <button onClick={() => cambiarEstado('revisado')} disabled={loading} style={{ flex: 2, padding: '10px', background: 'var(--green-soft)', border: '1px solid var(--green-border)', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--green)', letterSpacing: '0.08em' }}>
               {loading ? 'GUARDANDO...' : '✓ MARCAR COMO REVISADO'}
             </button>
           )}
-          {informe.estado !== 'archivado' && (
+          {!soloLectura && informe.estado !== 'archivado' && (
             <button onClick={() => cambiarEstado('archivado')} disabled={loading} style={{ flex: 1, padding: '10px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
               ARCHIVAR
             </button>
@@ -100,16 +100,21 @@ function InformeModal({ informe, onClose, onEstadoChange }) {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   );
 }
 
 export default function Informes() {
-  const [informes,   setInformes]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [selected,   setSelected]   = useState(null);
-  const [filterEstado, setFilterEstado] = useState('all');
-  const [filterSup,    setFilterSup]    = useState('all');
+  const { currentUser } = useAuth();
+  const esSupervisor = currentUser?.rol === 'supervisor';
+
+  const [informes,      setInformes]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [selected,      setSelected]      = useState(null);
+  const [mostrarCrear,  setMostrarCrear]  = useState(false);
+  const [filterEstado,  setFilterEstado]  = useState('all');
+  const [filterSup,     setFilterSup]     = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,6 +134,7 @@ export default function Informes() {
 
   const safeInformes = Array.isArray(informes) ? informes : [];
 
+  // Supervisores únicos para filtro
   const supervisores = [...new Map(safeInformes.map(i => [i.id_autor, i.usuario])).entries()]
     .map(([id, u]) => ({ id, nombre: u?.nombre_completo || `Supervisor ${id}` }));
 
@@ -144,11 +150,21 @@ export default function Informes() {
   return (
     <div style={{ padding: '24px 28px' }} className="anim-fade">
 
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>INFORMES</h1>
-        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>
-          Informes enviados por supervisores · {safeInformes.length} total
-        </span>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+        <div>
+          <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>INFORMES</h1>
+          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>
+            {esSupervisor ? 'Tus informes enviados al administrador' : `Informes de supervisores · ${safeInformes.length} total`}
+          </span>
+        </div>
+        {esSupervisor && (
+          <button onClick={() => setMostrarCrear(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: 'var(--amber)', border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.1em', color: '#000', fontWeight: 600 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            NUEVO INFORME
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 18 }}>
@@ -267,8 +283,106 @@ export default function Informes() {
           informe={selected}
           onClose={() => setSelected(null)}
           onEstadoChange={handleEstadoChange}
+          soloLectura={esSupervisor}
+        />
+      )}
+
+      {mostrarCrear && (
+        <ModalCrearInforme
+          onClose={() => setMostrarCrear(false)}
+          onCreado={() => { setMostrarCrear(false); load(); }}
         />
       )}
     </div>
+  );
+}
+
+function ModalCrearInforme({ onClose, onCreado }) {
+  const [form, setForm] = useState({ titulo: '', periodo_desde: '', periodo_hasta: '', resumen: '', observaciones: '', incidencias_count: 0 });
+  const [cargando, setCargando] = useState(false);
+  const [error,    setError]    = useState('');
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const estiloInput = { width: '100%', padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)', fontFamily: 'DM Sans', fontSize: 13, outline: 'none', boxSizing: 'border-box' };
+
+  const guardar = async () => {
+    if (!form.titulo || !form.periodo_desde || !form.periodo_hasta || !form.resumen)
+      return setError('Título, período y resumen son obligatorios');
+    setCargando(true);
+    try {
+      await api.post('/informes', form);
+      onCreado();
+    } catch(e) { setError(e.error || 'Error al guardar'); setCargando(false); }
+  };
+
+  return (
+    <Portal>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflowY: 'auto' }}>
+        <div className="mg-card" style={{ width: '100%', maxWidth: 520, padding: 28, margin: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+            <div>
+              <h3 style={{ fontFamily: 'Bebas Neue', fontSize: 24, color: 'var(--text-primary)', letterSpacing: '0.1em', lineHeight: 1 }}>NUEVO INFORME</h3>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>El informe será visible para el administrador</p>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          {error && (
+            <div style={{ padding: '8px 12px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 8, marginBottom: 14 }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--accent)' }}>{error}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>TÍTULO DEL INFORME</p>
+              <input value={form.titulo} onChange={e => set('titulo', e.target.value)}
+                placeholder="Ej: Informe semanal zona norte — mayo 2026" style={estiloInput}
+                onFocus={e => e.target.style.borderColor = 'var(--amber-border)'}
+                onBlur={e  => e.target.style.borderColor = 'var(--border)'} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>PERÍODO DESDE</p>
+                <input type="date" value={form.periodo_desde} onChange={e => set('periodo_desde', e.target.value)} style={estiloInput} />
+              </div>
+              <div>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>PERÍODO HASTA</p>
+                <input type="date" value={form.periodo_hasta} onChange={e => set('periodo_hasta', e.target.value)} style={estiloInput} />
+              </div>
+            </div>
+            <div>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>N° DE INCIDENCIAS</p>
+              <input type="number" min="0" value={form.incidencias_count}
+                onChange={e => set('incidencias_count', parseInt(e.target.value) || 0)} style={estiloInput} />
+            </div>
+            <div>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>RESUMEN DE ACTIVIDAD *</p>
+              <textarea value={form.resumen} onChange={e => set('resumen', e.target.value)}
+                placeholder="Describe las actividades, incidencias y estado general del período..." rows={4}
+                style={{ ...estiloInput, resize: 'vertical', minHeight: 90 }}
+                onFocus={e => e.target.style.borderColor = 'var(--amber-border)'}
+                onBlur={e  => e.target.style.borderColor = 'var(--border)'} />
+            </div>
+            <div>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>OBSERVACIONES</p>
+              <textarea value={form.observaciones} onChange={e => set('observaciones', e.target.value)}
+                placeholder="Observaciones adicionales o recomendaciones..." rows={3}
+                style={{ ...estiloInput, resize: 'vertical', minHeight: 70 }}
+                onFocus={e => e.target.style.borderColor = 'var(--amber-border)'}
+                onBlur={e  => e.target.style.borderColor = 'var(--border)'} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            <button onClick={onClose} disabled={cargando} style={{ flex: 1, padding: '12px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 9, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>CANCELAR</button>
+            <button onClick={guardar} disabled={cargando} style={{ flex: 2, padding: '12px', background: cargando ? 'var(--bg-surface)' : 'var(--amber)', border: 'none', borderRadius: 9, cursor: cargando ? 'wait' : 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, color: cargando ? 'var(--text-muted)' : '#000', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {cargando ? 'ENVIANDO...' : 'ENVIAR AL ADMINISTRADOR →'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
   );
 }

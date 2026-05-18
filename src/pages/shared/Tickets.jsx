@@ -242,7 +242,6 @@ function ModalAsignar({ ticket, tecnicos, onClose, onAsignado }) {
 }
 
 function ModalDetalle({ ticket, puedeAsignar, tecnicos, onClose, onActualizado }) {
-  const { currentUser } = useAuth();
   const [mostrarAsignar, setMostrarAsignar] = useState(false);
 
   const yaAsignado = ['asignado', 'en_proceso'].includes(ticket.estado);

@@ -95,7 +95,7 @@ export default function Profile() {
       setPerfil({ nombre_completo: currentUser.nombre_completo || '', telefono: currentUser.telefono || '', direccion: currentUser.direccion || '' });
     }
     if (esUsuario) { cargarVehiculos(); cargarContactos(); }
-  }, [currentUser]);
+  }, [currentUser, esUsuario]);
 
   const cargarVehiculos = async () => {
     try { setVehiculos(await vehicleService.getMine()); } catch {}
@@ -214,10 +214,10 @@ export default function Profile() {
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-  {[
-    ...(esUsuario ? [['Plan', currentUser?.plan_suscripcion || 'básico']] : []),
-    ['Desde', currentUser?.fecha_registro ? new Date(currentUser.fecha_registro).toLocaleDateString('es-PE') : '—'],
-  ].map(([k, v]) => (
+              {[
+                ['Plan',  currentUser?.plan_suscripcion || 'básico'],
+                ['Desde', currentUser?.fecha_registro ? new Date(currentUser.fecha_registro).toLocaleDateString('es-PE') : '—'],
+              ].map(([k, v]) => (
                 <div key={k} style={{ padding: '8px 10px', background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <p style={{ fontFamily: 'JetBrains Mono', fontSize: 7, color: 'var(--text-muted)', marginBottom: 3 }}>{k.toUpperCase()}</p>
                   <p style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: 'var(--text-secondary)' }}>{v}</p>

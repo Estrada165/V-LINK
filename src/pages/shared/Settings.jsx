@@ -95,7 +95,7 @@ const SeccionInfoSistema = ({ extendida = false }) => (
   <Card>
     <Label>INFORMACIÓN DEL SISTEMA</Label>
     {[
-      ['Versión',       'v1.0'                  ],
+      ['Versión',       'v2.4.1'                  ],
       ['Backend',       'Railway · Node.js 20'    ],
       ['Base de datos', 'Supabase PostgreSQL'      ],
       ...(extendida ? [
@@ -122,7 +122,7 @@ const SeccionPruebaConexion = () => {
           <div className="anim-blink" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--green)', letterSpacing: '0.1em' }}>BACKEND EN LÍNEA</span>
         </div>
-        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-faint)' }}></span>
+        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-faint)' }}>v2.4.1</span>
       </div>
       <button onClick={() => { setProbando(true); setTimeout(() => setProbando(false), 2000); }}
         style={{ width: '100%', padding: '11px', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'JetBrains Mono', fontSize: 11, letterSpacing: '0.12em', transition: 'all .25s', background: probando ? 'var(--green-soft)' : 'var(--bg-surface)', border: `1px solid ${probando ? 'var(--green-border)' : 'var(--border)'}`, color: probando ? 'var(--green)' : 'var(--text-secondary)' }}>
@@ -266,6 +266,9 @@ function SettingsAdmin() {
   );
 }
 
+const MAPA_MODO_BD = { armed: 'armado', disarmed: 'desarmado', valet: 'valet', emergency: 'emergencia' };
+const MAPA_MODO_UI = { armado: 'armed', desarmado: 'disarmed', valet: 'valet', emergencia: 'emergency' };
+
 function SettingsUsuario() {
   const navigate = useNavigate();
 
@@ -289,8 +292,8 @@ function SettingsUsuario() {
     { key: 'emergency', label: 'Emergencia', hex: '#ff2222'           },
   ];
 
-  const mapaModoBD = { armed: 'armado', disarmed: 'desarmado', valet: 'valet', emergency: 'emergencia' };
-  const mapaModoUI = { armado: 'armed', desarmado: 'disarmed', valet: 'valet', emergencia: 'emergency' };
+  const mapaModoBD = MAPA_MODO_BD;
+  const mapaModoUI = MAPA_MODO_UI;
 
   useEffect(() => {
     const cargar = async () => {
@@ -311,7 +314,7 @@ function SettingsUsuario() {
       setModoAnillo('armed'); setDistancia(5); setDemora(5); setBrillo(70); setAlertas(true); setGps(true);
       try {
         const cfg = await configService.get(vehiculoSel.id_vehiculo);
-        if (cfg.modo_seguridad)                   setModoAnillo(mapaModoUI[cfg.modo_seguridad] || 'armed');
+        if (cfg.modo_seguridad)                   setModoAnillo(MAPA_MODO_UI[cfg.modo_seguridad] || 'armed');
         if (cfg.umbral_apagado_ms)                setDemora(Math.round(cfg.umbral_apagado_ms / 1000) || 5);
         if (cfg.radio_proximidad_cm)              setDistancia(Math.round(cfg.radio_proximidad_cm / 100) || 5);
         if (cfg.alertas_movimiento !== undefined) setAlertas(cfg.alertas_movimiento);
@@ -327,7 +330,7 @@ function SettingsUsuario() {
     try {
       await configService.save({
         id_vehiculo:         vehiculoSel.id_vehiculo,
-        modo_seguridad:      mapaModoBD[modoAnillo],
+        modo_seguridad:      MAPA_MODO_BD[modoAnillo],
         umbral_apagado_ms:   demora * 1000,
         radio_proximidad_cm: distancia * 100,
         alertas_movimiento:  alertas,

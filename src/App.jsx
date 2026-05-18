@@ -103,6 +103,7 @@ const NAV_POR_ROL = {
     { ruta: '/dashboard', etiqueta: 'DASHBOARD', Icono: ICONOS.dashboard },
     { ruta: '/users',     etiqueta: 'USUARIOS',  Icono: ICONOS.usuarios  },
     { ruta: '/tickets',   etiqueta: 'TICKETS',   Icono: ICONOS.tickets   },
+    { ruta: '/informes',  etiqueta: 'INFORMES',  Icono: ICONOS.informes  },
     { ruta: '/audit',     etiqueta: 'AUDITORÍA', Icono: ICONOS.auditoria },
     { ruta: '/map',       etiqueta: 'MAPAS',     Icono: ICONOS.mapa      },
     { ruta: '/routes',    etiqueta: 'RUTAS',     Icono: ICONOS.rutas     },
@@ -397,7 +398,7 @@ export default function App() {
             } />
 
             <Route path="/informes" element={
-              <RutaProtegida roles={['admin']}>
+              <RutaProtegida roles={['admin', 'supervisor']}>
                 <LayoutApp><Informes /></LayoutApp>
               </RutaProtegida>
             } />

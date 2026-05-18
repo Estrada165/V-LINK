@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supervisorService, ticketService, adminService } from '../../services/api';
 import api from '../../services/api';
 import { fmtDateTime } from '../../utils/dateUtils';
+import Portal from '../../components/ui/Portal';
 
 const Card = ({ children, style = {}, onClick }) => (
   <div className={`mg-card${onClick ? ' mg-card-hover' : ''}`}
@@ -67,8 +68,9 @@ function ModalInforme({ onClose, onGuardado }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflowY: 'auto' }}>
-      <div className="mg-card" style={{ width: '100%', maxWidth: 520, padding: 28, margin: 'auto' }}>
+    <Portal>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflowY: 'auto' }}>
+        <div className="mg-card" style={{ width: '100%', maxWidth: 520, padding: 28, margin: 'auto' }}>
         <h3 style={{ fontFamily: 'Bebas Neue', fontSize: 24, color: 'var(--text-primary)', letterSpacing: '0.1em', marginBottom: 4 }}>NUEVO INFORME</h3>
         <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginBottom: 20 }}>El informe será visible para el administrador</p>
 
@@ -142,7 +144,8 @@ function ModalInforme({ onClose, onGuardado }) {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   );
 }
 
@@ -162,11 +165,12 @@ function ModalAsignarTicket({ ticket, tecnicos, onClose, onAsignado }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div className="mg-card" style={{ width: '100%', maxWidth: 400, padding: 26 }}>
-        <h3 style={{ fontFamily: 'Bebas Neue', fontSize: 22, color: 'var(--text-primary)', letterSpacing: '0.1em', marginBottom: 4 }}>ASIGNAR TICKET</h3>
-        <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginBottom: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          #{ticket.id_ticket} · {ticket.titulo}
+    <Portal>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div className="mg-card" style={{ width: '100%', maxWidth: 400, padding: 26 }}>
+          <h3 style={{ fontFamily: 'Bebas Neue', fontSize: 22, color: 'var(--text-primary)', letterSpacing: '0.1em', marginBottom: 4 }}>ASIGNAR TICKET</h3>
+          <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginBottom: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            #{ticket.id_ticket} · {ticket.titulo}
         </p>
 
         {error && (
@@ -203,14 +207,15 @@ function ModalAsignarTicket({ ticket, tecnicos, onClose, onAsignado }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 9, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>CANCELAR</button>
-          <button onClick={asignar} disabled={cargando} style={{ flex: 2, padding: '12px', background: cargando ? 'var(--bg-surface)' : 'var(--amber)', border: 'none', borderRadius: 9, cursor: cargando ? 'wait' : 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, color: cargando ? 'var(--text-muted)' : '#000', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {cargando ? <><Spinner/>ASIGNANDO...</> : 'ASIGNAR →'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            <button onClick={onClose} style={{ flex: 1, padding: '12px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 9, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>CANCELAR</button>
+            <button onClick={asignar} disabled={cargando} style={{ flex: 2, padding: '12px', background: cargando ? 'var(--bg-surface)' : 'var(--amber)', border: 'none', borderRadius: 9, cursor: cargando ? 'wait' : 'pointer', fontFamily: 'JetBrains Mono', fontSize: 10, color: cargando ? 'var(--text-muted)' : '#000', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {cargando ? <><Spinner/>ASIGNANDO...</> : 'ASIGNAR →'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 

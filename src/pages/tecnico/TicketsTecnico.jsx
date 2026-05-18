@@ -1,16 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ticketService } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
 import { fmtDateTime } from '../../utils/dateUtils';
 import ThemeToggle from '../../components/ui/ThemeToggle';
-import Portal from '../../components/ui/Portal';
 
 const Card = ({ children, style = {} }) => (
   <div className="mg-card" style={{ padding: '16px 18px', ...style }}>{children}</div>
-);
-
-const Label = ({ children }) => (
-  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-muted)', marginBottom: 12 }}>{children}</p>
 );
 
 const CajaError = ({ msg }) => msg ? (
@@ -97,7 +91,6 @@ function ModalActualizar({ ticket, onClose, onActualizado }) {
   const yaResuelto = ticket.estado === 'resuelto';
 
   return (
-    <Portal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div className="mg-card" style={{ width: '100%', maxWidth: 480, padding: 26 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
@@ -165,7 +158,6 @@ function ModalActualizar({ ticket, onClose, onActualizado }) {
         </div>
       </div>
     </div>
-     </Portal>
   );
 }
 
@@ -224,7 +216,6 @@ function TarjetaTicket({ ticket, onClick }) {
 }
 
 export default function TicketsTecnico() {
-  const { currentUser } = useAuth();
 
   const [tickets,       setTickets]       = useState([]);
   const [cargando,      setCargando]      = useState(true);
