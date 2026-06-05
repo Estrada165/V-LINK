@@ -17,7 +17,7 @@ const Divisor = () => <div style={{ height: 1, background: 'var(--border)', marg
 
 const Toggle = ({ value, onChange }) => (
   <button onClick={() => onChange(!value)} style={{
-    padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
     background: value ? 'var(--green-soft)' : 'var(--bg-surface)',
     border: `1px solid ${value ? 'var(--green-border)' : 'var(--border)'}`,
     fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.08em',

@@ -9,14 +9,6 @@ const fmtFecha = (iso) => {
   });
 };
 
-const fmtDateTime = (iso) => {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-PE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima'
-  });
-};
-
 const FEATURES_PLAN = [
   'Todo lo del plan gratuito',
   'Vehículos ilimitados',
@@ -276,7 +268,6 @@ export default function PlanPage() {
   const [estado,     setEstado]     = useState(null);
   const [cargando,   setCargando]   = useState(true);
   const [modalTipo,  setModalTipo]  = useState(null);
-  const [procesando, setProcesando] = useState(false);
   const [exito,      setExito]      = useState(null);
 
   const cargar = useCallback(async () => {
@@ -287,14 +278,12 @@ export default function PlanPage() {
   useEffect(() => { cargar(); }, [cargar]);
 
   const confirmarPago = async (metodoPago) => {
-    setProcesando(true);
     try {
       const res = await planService.simularPago(modalTipo, metodoPago);
       setExito(res);
       setModalTipo(null);
       await cargar();
     } catch (e) { console.error(e); }
-    setProcesando(false);
   };
 
   if (cargando) return (
