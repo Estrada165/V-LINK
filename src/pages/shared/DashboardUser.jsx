@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AnimatedRing from '../../components/ring/AnimatedRing';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import TarjetaPlan from '../../components/ui/TarjetaPlan';
 import { useAuth } from '../../context/AuthContext';
-import { vehicleService, alertService, routeService, ticketService } from '../../services/api';
+import { vehicleService, alertService, routeService, ticketService, planService } from '../../services/api';
 import { fmtDateTime } from '../../utils/dateUtils';
-import Portal from '../../components/ui/Portal';
-
 
 const Card = ({ children, style = {}, onClick }) => (
   <div className={`mg-card${onClick ? ' mg-card-hover' : ''}`} onClick={onClick}
@@ -92,7 +91,6 @@ function ModalReportarProblema({ vehiculos, onClose, onCreado }) {
   };
 
   return (
-    <Portal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div className="mg-card" style={{ width: '100%', maxWidth: 460, padding: 26, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
@@ -114,7 +112,7 @@ function ModalReportarProblema({ vehiculos, onClose, onCreado }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.1em' }}>TIPO DE PROBLEMA</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6 }}>
               {Object.entries(ETIQUETAS_TIPO).map(([key, label]) => {
                 const activo = form.tipo === key;
                 return (
@@ -159,7 +157,6 @@ function ModalReportarProblema({ vehiculos, onClose, onCreado }) {
         </div>
       </div>
     </div>
-    </Portal>
   );
 }
 
@@ -175,20 +172,23 @@ export default function DashboardUser() {
   const [cargando,       setCargando]       = useState(true);
   const [mostrarTicket,  setMostrarTicket]  = useState(false);
   const [ticketEnviado,  setTicketEnviado]  = useState(false);
+  const [estadoPlan,     setEstadoPlan]     = useState(null);
 
   useEffect(() => {
     const cargarDatos = async () => {
       setCargando(true);
       try {
-        const [vehs, alts, rts] = await Promise.all([
+        const [vehs, alts, rts, plan] = await Promise.all([
           vehicleService.getAll(),
           alertService.getAll(),
           routeService.getAll(),
+          planService.estado().catch(() => null),
         ]);
         setVehiculos(vehs);
         if (vehs.length > 0) setVehiculoActivo(vehs[0]);
         setAlertas(alts.slice(0, 4));
         setRutas(rts.slice(0, 3));
+        setEstadoPlan(plan);
       } catch (e) { console.error(e); }
       setCargando(false);
     };
@@ -196,6 +196,25 @@ export default function DashboardUser() {
   }, []);
 
   const ringStatus = MODOS[modo]?.ringStatus || 'disarmed';
+  const planActivo = estadoPlan?.activo === true;
+
+  const BloqueoPlan = ({ children, feature }) => {
+    if (planActivo) return children;
+    return (
+      <div style={{ position: 'relative', userSelect: 'none' }}>
+        <div style={{ filter: 'blur(2px)', pointerEvents: 'none', opacity: 0.4 }}>{children}</div>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', borderRadius: 12, backdropFilter: 'blur(1px)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ marginBottom: 6 }}>
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 8 }}>Requiere plan activo</p>
+          <button onClick={() => navigate('/plan')} style={{ padding: '5px 12px', background: 'var(--accent)', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 8, color: '#fff', letterSpacing: '0.06em' }}>
+            ACTIVAR →
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   if (cargando) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
@@ -210,7 +229,7 @@ export default function DashboardUser() {
   );
 
   return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
+    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
@@ -236,6 +255,8 @@ export default function DashboardUser() {
           <ThemeToggle compact />
         </div>
       </div>
+
+      <TarjetaPlan estadoPlan={estadoPlan} />
 
       {vehiculos.length > 1 && (
         <div style={{ marginBottom: 18 }}>
@@ -295,8 +316,7 @@ export default function DashboardUser() {
             )}
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {[
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>            {[
               { label: 'VER EN MAPA', path: '/map',      color: 'var(--cyan)'           },
               { label: 'MIS RUTAS',   path: '/routes',   color: 'var(--text-secondary)' },
               { label: 'AJUSTES',     path: '/settings', color: 'var(--amber)'          },
@@ -310,6 +330,7 @@ export default function DashboardUser() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <BloqueoPlan feature="modos">
           <Card>
             <Label>MODOS DE SEGURIDAD</Label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -336,7 +357,9 @@ export default function DashboardUser() {
               Control físico disponible al conectar anillo BLE
             </p>
           </Card>
+          </BloqueoPlan>
 
+          <BloqueoPlan feature="alertas">
           <Card>
             <Label action="VER TODAS →" onAction={() => navigate('/map')}>MIS ALERTAS</Label>
             {alertas.length === 0 ? <Vacio msg="Sin alertas registradas" /> :
@@ -358,9 +381,11 @@ export default function DashboardUser() {
               })
             }
           </Card>
+          </BloqueoPlan>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <BloqueoPlan feature="rutas">
           <Card>
             <Label action="VER TODAS →" onAction={() => navigate('/routes')}>MIS RUTAS RECIENTES</Label>
             {rutas.length === 0 ? <Vacio msg="Sin rutas registradas" /> :
@@ -384,7 +409,9 @@ export default function DashboardUser() {
               })
             }
           </Card>
+          </BloqueoPlan>
 
+          <BloqueoPlan feature="vehiculo">
           {vehiculoActivo && (
             <Card>
               <Label>VEHÍCULO ACTIVO</Label>
@@ -409,6 +436,7 @@ export default function DashboardUser() {
               </button>
             </Card>
           )}
+          </BloqueoPlan>
         </div>
 
       </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { alertService, heatmapService, vehicleService } from '../../services/api';
+import { alertService, heatmapService, vehicleService, planService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 import { fmtDateTime } from '../../utils/dateUtils';
@@ -206,7 +206,7 @@ function ModalReporte({ latlng, vehiculoId, onConfirmar, onCancelar }) {
 }
 
 const BotonMapa = ({ activo, onClick, children }) => (
-  <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', background: activo ? 'var(--accent-soft)' : 'var(--nav-bg)', backdropFilter: 'blur(12px)', border: `1px solid ${activo ? 'var(--accent-border)' : 'var(--border)'}`, borderRadius: 10, cursor: 'pointer', color: activo ? 'var(--accent)' : 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.08em', transition: 'all .2s', whiteSpace: 'nowrap' }}>
+  <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', background: activo ? 'var(--accent-soft)' : 'var(--nav-bg)', backdropFilter: 'blur(12px)', border: `1px solid ${activo ? 'var(--accent-border)' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', color: activo ? 'var(--accent)' : 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 7, letterSpacing: '0.06em', transition: 'all .2s', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
     {children}
   </button>
 );
@@ -221,7 +221,16 @@ const FILTROS_TIEMPO = [
 
 export default function MapPage() {
   const { currentUser } = useAuth();
-  const puedeReportar = currentUser?.rol !== 'tecnico';
+  const [estadoPlan,   setEstadoPlan]   = useState(null);
+
+  useEffect(() => {
+    if (currentUser?.rol === 'usuario') {
+      planService.estado().then(d => setEstadoPlan(d)).catch(() => {});
+    }
+  }, [currentUser]);
+
+  const puedeReportar = currentUser?.rol !== 'tecnico' &&
+    (currentUser?.rol !== 'usuario' || estadoPlan?.activo === true);
 
   const [todasIncidencias, setTodasIncidencias] = useState([]);
   const [incidencias,      setIncidencias]      = useState([]);
@@ -363,29 +372,29 @@ export default function MapPage() {
         )}
 
         {errorUbic && (
-          <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1500, background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', borderRadius: 10, padding: '10px 14px', maxWidth: 300, textAlign: 'center' }}>
+          <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1500, background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', borderRadius: 10, padding: '10px 14px', maxWidth: 280, textAlign: 'center', pointerEvents: 'all' }}>
             <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--amber)' }}>{errorUbic}</p>
             <button onClick={solicitarUbicacion} style={{ marginTop: 6, padding: '4px 10px', background: 'var(--amber)', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 8, color: '#000' }}>REINTENTAR</button>
           </div>
         )}
 
-        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 5, maxWidth: 140 }}>
           <BotonMapa activo={seguimiento} onClick={() => setSeguimiento(s => !s)}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
             {seguimiento ? 'ACTIVO' : 'SEGUIMIENTO'}
           </BotonMapa>
           <BotonMapa activo={mostrarCalor} onClick={() => setMostrarCalor(h => !h)}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/></svg>
             {mostrarCalor ? 'CALOR ON' : 'CALOR OFF'}
           </BotonMapa>
           {puedeReportar && (
             <BotonMapa activo={modoReporte} onClick={() => setModoReporte(r => !r)}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              {modoReporte ? 'CLIC EN MAPA...' : 'REPORTAR'}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              {modoReporte ? 'CLIC EN MAPA' : 'REPORTAR'}
             </BotonMapa>
           )}
           <BotonMapa activo={false} onClick={() => { if (ubicacion) setVolarA([ubicacion.lat, ubicacion.lng]); else solicitarUbicacion(); }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
             MI UBICACIÓN
           </BotonMapa>
         </div>
@@ -505,7 +514,7 @@ export default function MapPage() {
         </div>
 
         <div style={{ padding: '10px 14px 12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-          {puedeReportar && (
+          {puedeReportar ? (
             <button onClick={() => {
               if (ubicacion) { setCoordsClic({ lat: ubicacion.lat, lng: ubicacion.lng }); setModalReporte(true); }
               else { solicitarUbicacion(); setModoReporte(true); }
@@ -515,7 +524,14 @@ export default function MapPage() {
               </svg>
               {reporteEnviado ? 'ENVIADO' : 'REPORTAR INCIDENCIA'}
             </button>
-          )}
+          ) : currentUser?.rol === 'usuario' ? (
+            <button onClick={() => window.location.href = '/plan'} style={{ width: '100%', padding: '10px', borderRadius: 10, cursor: 'pointer', background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.08em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              REQUIERE PLAN ACTIVO
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

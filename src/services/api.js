@@ -140,4 +140,15 @@ export const healthService = {
   },
 };
 
+export const planService = {
+  estado:       ()                  => api.get('/plan/estado').then(r => r.data),
+  simularPago:  (tipo, metodo_pago) => api.post('/plan/simular-pago', { tipo, metodo_pago }).then(r => r.data),
+  cancelar:     ()                  => api.post('/plan/cancelar').then(r => r.data),
+};
+
+export const pagoService = {
+  getAll:          (params = {}) => api.get(`/admin/pagos${construirQuery(params)}`).then(r => r.data),
+  getSuscripciones: ()           => api.get('/admin/suscripciones').then(r => r.data),
+};
+
 export default api;

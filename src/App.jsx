@@ -8,6 +8,7 @@ import DashboardAdmin     from './pages/admin/DashboardAdmin';
 import UsersAdmin         from './pages/admin/UsersAdmin';
 import AuditLog           from './pages/admin/AuditLog';
 import Informes           from './pages/admin/Informes';
+import PagosAdmin         from './pages/admin/PagosAdmin';
 import DashboardSupervisor from './pages/supervisor/DashboardSupervisor';
 import DashboardTecnico   from './pages/tecnico/DashboardTecnico';
 import TicketsTecnico     from './pages/tecnico/TicketsTecnico';
@@ -17,6 +18,7 @@ import RoutesPage         from './pages/shared/Routes';
 import Settings           from './pages/shared/Settings';
 import Profile            from './pages/shared/Profile';
 import Tickets            from './pages/shared/Tickets';
+import PlanPage           from './pages/shared/PlanPage';
 import NotFound           from './pages/shared/NotFound';
 
 const ICONOS = {
@@ -85,6 +87,12 @@ const ICONOS = {
       <line x1="9" y1="12" x2="15" y2="12"/>
     </svg>
   ),
+  pagos: () => (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="4" width="22" height="16" rx="2"/>
+      <line x1="1" y1="10" x2="23" y2="10"/>
+    </svg>
+  ),
 };
 
 const NAV_POR_ROL = {
@@ -93,6 +101,7 @@ const NAV_POR_ROL = {
     { ruta: '/users',     etiqueta: 'USUARIOS',  Icono: ICONOS.usuarios  },
     { ruta: '/audit',     etiqueta: 'AUDITORÍA', Icono: ICONOS.auditoria },
     { ruta: '/informes',  etiqueta: 'INFORMES',  Icono: ICONOS.informes  },
+    { ruta: '/pagos',     etiqueta: 'PAGOS',     Icono: ICONOS.pagos     },
     { ruta: '/tickets',   etiqueta: 'TICKETS',   Icono: ICONOS.tickets   },
     { ruta: '/map',       etiqueta: 'MAPAS',     Icono: ICONOS.mapa      },
     { ruta: '/routes',    etiqueta: 'RUTAS',     Icono: ICONOS.rutas     },
@@ -104,6 +113,7 @@ const NAV_POR_ROL = {
     { ruta: '/users',     etiqueta: 'USUARIOS',  Icono: ICONOS.usuarios  },
     { ruta: '/tickets',   etiqueta: 'TICKETS',   Icono: ICONOS.tickets   },
     { ruta: '/informes',  etiqueta: 'INFORMES',  Icono: ICONOS.informes  },
+    { ruta: '/pagos',     etiqueta: 'PAGOS',     Icono: ICONOS.pagos     },
     { ruta: '/audit',     etiqueta: 'AUDITORÍA', Icono: ICONOS.auditoria },
     { ruta: '/map',       etiqueta: 'MAPAS',     Icono: ICONOS.mapa      },
     { ruta: '/routes',    etiqueta: 'RUTAS',     Icono: ICONOS.rutas     },
@@ -111,17 +121,18 @@ const NAV_POR_ROL = {
     { ruta: '/profile',   etiqueta: 'PERFIL',    Icono: ICONOS.perfil    },
   ],
   tecnico: [
-    { ruta: '/dashboard',        etiqueta: 'DASHBOARD', Icono: ICONOS.dashboard },
-    { ruta: '/tickets-tecnico',  etiqueta: 'MIS TICKETS', Icono: ICONOS.tickets },
-    { ruta: '/map',              etiqueta: 'MAPAS',     Icono: ICONOS.mapa      },
-    { ruta: '/settings',         etiqueta: 'AJUSTES',   Icono: ICONOS.ajustes   },
-    { ruta: '/profile',          etiqueta: 'PERFIL',    Icono: ICONOS.perfil    },
+    { ruta: '/dashboard',        etiqueta: 'DASHBOARD',   Icono: ICONOS.dashboard },
+    { ruta: '/tickets-tecnico',  etiqueta: 'MIS TICKETS', Icono: ICONOS.tickets   },
+    { ruta: '/map',              etiqueta: 'MAPAS',       Icono: ICONOS.mapa      },
+    { ruta: '/settings',         etiqueta: 'AJUSTES',     Icono: ICONOS.ajustes   },
+    { ruta: '/profile',          etiqueta: 'PERFIL',      Icono: ICONOS.perfil    },
   ],
   usuario: [
     { ruta: '/dashboard', etiqueta: 'DASHBOARD', Icono: ICONOS.dashboard },
     { ruta: '/map',       etiqueta: 'MAPAS',     Icono: ICONOS.mapa      },
     { ruta: '/routes',    etiqueta: 'RUTAS',     Icono: ICONOS.rutas     },
     { ruta: '/tickets',   etiqueta: 'TICKETS',   Icono: ICONOS.tickets   },
+    { ruta: '/plan',      etiqueta: 'MI PLAN',   Icono: ICONOS.pagos     },
     { ruta: '/settings',  etiqueta: 'AJUSTES',   Icono: ICONOS.ajustes   },
     { ruta: '/profile',   etiqueta: 'PERFIL',    Icono: ICONOS.perfil    },
   ],
@@ -138,6 +149,8 @@ const TITULOS_PAGINA = {
   '/routes':          'Rutas',
   '/settings':        'Ajustes',
   '/profile':         'Mi Perfil',
+  '/pagos':           'Pagos y Suscripciones',
+  '/plan':            'Mi Plan',
 };
 
 const COLORES_ROL = {
@@ -422,6 +435,18 @@ export default function App() {
             <Route path="/routes"   element={<RutaProtegida><LayoutApp><RoutesPage /></LayoutApp></RutaProtegida>} />
             <Route path="/settings" element={<RutaProtegida><LayoutApp><Settings   /></LayoutApp></RutaProtegida>} />
             <Route path="/profile"  element={<RutaProtegida><LayoutApp><Profile    /></LayoutApp></RutaProtegida>} />
+
+            <Route path="/plan" element={
+              <RutaProtegida roles={['usuario']}>
+                <LayoutApp><PlanPage /></LayoutApp>
+              </RutaProtegida>
+            } />
+
+            <Route path="/pagos" element={
+              <RutaProtegida roles={['admin', 'supervisor']}>
+                <LayoutApp><PagosAdmin /></LayoutApp>
+              </RutaProtegida>
+            } />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -115,8 +115,7 @@ function ModalCrearTicket({ vehiculos, onClose, onCreado }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>TIPO DE PROBLEMA</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {Object.entries(ETIQUETAS_TIPO).map(([key, label]) => {
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>              {Object.entries(ETIQUETAS_TIPO).map(([key, label]) => {
                 const activo = form.tipo === key;
                 return (
                   <button key={key} onClick={() => set('tipo', key)} style={{ padding: '9px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.06em', transition: 'all .15s', background: activo ? 'var(--accent-soft)' : 'var(--bg-surface)', border: `1px solid ${activo ? 'var(--accent-border)' : 'var(--border)'}`, color: activo ? 'var(--accent)' : 'var(--text-muted)' }}>
@@ -265,7 +264,7 @@ function ModalDetalle({ ticket, puedeAsignar, tecnicos, onClose, onActualizado }
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 16 }}>
               {[
                 ['Tipo',     ETIQUETAS_TIPO[ticket.tipo] || ticket.tipo],
                 ['Creado',   fmtDateTime(ticket.fecha_creacion)],
@@ -390,7 +389,7 @@ export default function Tickets() {
   };
 
   return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
+    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
         <div>

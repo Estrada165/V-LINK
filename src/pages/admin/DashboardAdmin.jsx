@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../../components/ui/ThemeToggle';
-import { adminService, alertService, ticketService } from '../../services/api';
+import { adminService, alertService, ticketService, pagoService } from '../../services/api';
 import api from '../../services/api';
 
 const Card = ({ children, style = {}, onClick }) => (
@@ -96,6 +96,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
   const [saludSistema,  setSaludSistema]  = useState(null);
   const [cargando,      setCargando]      = useState(true);
   const [cargandoSalud, setCargandoSalud] = useState(true);
+  const [statsSubs,     setStatsSubs]     = useState(null);
 
   const safeUsuarios  = Array.isArray(usuarios)  ? usuarios  : [];
   const safeAlertas   = Array.isArray(alertas)   ? alertas   : [];
@@ -106,11 +107,12 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
     const cargarDatos = async () => {
       setCargando(true);
       try {
-        const [resUsuarios, resAlertas, resTks, resAud] = await Promise.all([
+        const [resUsuarios, resAlertas, resTks, resAud, resSubs] = await Promise.all([
           adminService.getAllUsers(),
           alertService.getAll(),
           ticketService.getAll(),
           adminService.getAuditoria({ limit: 6 }),
+          pagoService.getSuscripciones().catch(() => null),
         ]);
         const listaUsuarios = Array.isArray(resUsuarios)
           ? resUsuarios
@@ -119,6 +121,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
         setAlertas(Array.isArray(resAlertas) ? resAlertas.slice(0, 6) : []);
         setTickets(Array.isArray(resTks)     ? resTks                  : []);
         setAuditoria(Array.isArray(resAud)   ? resAud                  : []);
+        if (resSubs?.stats)                    setStatsSubs(resSubs.stats);
       } catch (e) { console.error(e); }
       setCargando(false);
     };
@@ -163,8 +166,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
   );
 
   return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
-
+    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
         <div>
           {pendingCount > 0 && (
@@ -215,6 +217,30 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
           </Card>
         ))}
       </div>
+
+      {statsSubs && (
+        <Card style={{ marginBottom: 20, cursor: 'pointer' }} onClick={() => navigate('/pagos')}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 10 }}>SUSCRIPCIONES DE USUARIOS</p>
+              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'CON PLAN',    valor: statsSubs.activos  || 0, color: 'var(--green)'  },
+                  { label: 'VENCIDOS',    valor: statsSubs.vencidos || 0, color: 'var(--accent)' },
+                  { label: 'SIN PLAN',    valor: statsSubs.sin_plan || 0, color: 'var(--amber)'  },
+                  { label: 'TOTAL USERS', valor: statsSubs.total_usuarios || 0, color: 'var(--text-secondary)' },
+                ].map(s => (
+                  <div key={s.label}>
+                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 7, color: 'var(--text-muted)', marginBottom: 3 }}>{s.label}</p>
+                    <p style={{ fontFamily: 'Bebas Neue', fontSize: 26, color: s.color, letterSpacing: '0.05em', lineHeight: 1 }}>{s.valor}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--cyan)', letterSpacing: '0.1em' }}>VER HISTORIAL DE PAGOS →</span>
+          </div>
+        </Card>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
 
@@ -272,7 +298,7 @@ export default function DashboardAdmin({ pendingCount = 0 }) {
               </div>
 
               {saludSistema.database?.counts && (
-                <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6 }}>
                   {[
                     { etiqueta: 'Usuarios',  valor: saludSistema.database.counts.usuarios  },
                     { etiqueta: 'Alertas',   valor: saludSistema.database.counts.alertas   },

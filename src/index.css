@@ -14,10 +14,10 @@
   --border: #1e1e1e;
   --border-mid: #282828;
   --border-strong: #333;
-  --text-primary: #f2f2f2;
-  --text-secondary: #a8a8a8;
-  --text-muted: #686868;
-  --text-faint: #2e2e2e;
+  --text-primary:   #f8f8f8;
+  --text-secondary: #d0d0d0;
+  --text-muted:     #a0a0a0;
+  --text-faint:     #585858;
   --accent: #e03030;
   --accent-dim: #a82020;
   --accent-soft: rgba(224, 48, 48, 0.09);
@@ -47,10 +47,10 @@
   --border: #dddbd8;
   --border-mid: #ccc9c5;
   --border-strong: #b8b5b0;
-  --text-primary: #0e0e0e;
-  --text-secondary: #484848;
-  --text-muted: #888582;
-  --text-faint: #c8c5c0;
+  --text-primary:   #0a0a0a;
+  --text-secondary: #252525;
+  --text-muted:     #484848;
+  --text-faint:     #848484;
   --accent: #c01818;
   --accent-dim: #8a1010;
   --accent-soft: rgba(192, 24, 24, 0.07);
@@ -124,51 +124,26 @@ body {
 }
 
 @keyframes spin-cw {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 @keyframes spin-ccw {
-  to {
-    transform: rotate(-360deg);
-  }
+  to { transform: rotate(-360deg); }
 }
 @keyframes ping-out {
-  0% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
+  0%   { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0;   }
 }
 @keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
 @keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.3; }
 }
 @keyframes scan {
-  0% {
-    top: 0%;
-  }
-  100% {
-    top: 100%;
-  }
+  0%   { top: 0%;   }
+  100% { top: 100%; }
 }
 
 .anim-cw {
@@ -197,9 +172,7 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  transition:
-    background 0.3s,
-    border-color 0.3s;
+  transition: background 0.3s, border-color 0.3s;
 }
 .mg-card-hover:hover {
   border-color: var(--border-mid);
@@ -283,10 +256,10 @@ input[type="range"] {
   ::-webkit-scrollbar { width: 0px; height: 0px; }
 }
 :root {
-  --fz-label:  11px;   
-  --fz-mono:   12px;   
-  --fz-body:   14px;   
-  --fz-title:  15px;  
+  --fz-label:  11px;
+  --fz-mono:   12px;
+  --fz-body:   14px;
+  --fz-title:  15px;
 }
 
 .mg-card span[style*="font-size: 7"],

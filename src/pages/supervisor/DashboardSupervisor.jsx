@@ -306,7 +306,7 @@ export default function DashboardSupervisor() {
   );
 
   return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
+    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
         <div>

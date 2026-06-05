@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { vehicleService, contactService } from '../../services/api';
+import { vehicleService, contactService, planService } from '../../services/api';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 
 const Card = ({ children, style = {} }) => (
@@ -13,26 +13,33 @@ const Label = ({ children }) => (
 
 const Divisor = () => <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />;
 
-const CampoInput = ({ label, valor, onChange, tipo = 'text', placeholder = '', soloLectura = false }) => (
-  <div style={{ marginBottom: 14 }}>
-    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 6 }}>{label}</p>
-    <input
-      type={tipo} value={valor || ''} onChange={e => onChange && onChange(e.target.value)}
-      placeholder={placeholder} readOnly={soloLectura}
-      style={{
-        width: '100%', padding: '10px 12px',
-        background: soloLectura ? 'var(--bg-surface)' : 'var(--bg-input)',
-        border: '1px solid var(--border)', borderRadius: 8,
-        color: soloLectura ? 'var(--text-muted)' : 'var(--text-primary)',
-        fontFamily: 'DM Sans', fontSize: 13, outline: 'none', transition: 'border .2s',
-        cursor: soloLectura ? 'not-allowed' : 'auto',
-        boxSizing: 'border-box',
-      }}
-      onFocus={e => !soloLectura && (e.target.style.borderColor = 'var(--accent-border)')}
-      onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
-    />
-  </div>
-);
+const CampoInput = ({ label, valor, onChange, tipo = 'text', placeholder = '', soloLectura = false, filtro }) => {
+  const [foco, setFoco] = useState(false);
+  const handleChange = (e) => {
+    if (!onChange) return;
+    const v = filtro ? filtro(e.target.value) : e.target.value;
+    onChange(v);
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: foco ? 'var(--accent)' : 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 6, transition: 'color .15s' }}>{label}</p>
+      <input
+        type={tipo} value={valor || ''} onChange={handleChange}
+        placeholder={placeholder} readOnly={soloLectura}
+        onFocus={() => setFoco(true)}
+        onBlur={() => setFoco(false)}
+        style={{
+          width: '100%', padding: '10px 12px',
+          background: soloLectura ? 'var(--bg-surface)' : 'var(--bg-input)',
+          border: `1px solid ${foco ? 'var(--accent-border)' : 'var(--border)'}`,
+          borderRadius: 8, color: soloLectura ? 'var(--text-muted)' : 'var(--text-primary)',
+          fontFamily: 'DM Sans', fontSize: 13, outline: 'none', transition: 'border .15s',
+          cursor: soloLectura ? 'not-allowed' : 'auto', boxSizing: 'border-box',
+        }}
+      />
+    </div>
+  );
+};
 
 const BotonGuardar = ({ onGuardar, guardado, cargando, label = 'GUARDAR CAMBIOS' }) => (
   <button onClick={onGuardar} disabled={cargando} style={{
@@ -89,12 +96,17 @@ export default function Profile() {
   const [nuevoContacto,    setNuevoContacto]    = useState({ nombre: '', telefono: '' });
   const [guardadoContacto, setGuardadoContacto] = useState(false);
   const [errContacto,      setErrContacto]      = useState('');
+  const [planActivo,       setPlanActivo]       = useState(false);
 
   useEffect(() => {
     if (currentUser) {
       setPerfil({ nombre_completo: currentUser.nombre_completo || '', telefono: currentUser.telefono || '', direccion: currentUser.direccion || '' });
     }
-    if (esUsuario) { cargarVehiculos(); cargarContactos(); }
+    if (esUsuario) {
+      cargarVehiculos();
+      cargarContactos();
+      planService.estado().then(d => setPlanActivo(d?.activo === true)).catch(() => {});
+    }
   }, [currentUser, esUsuario]);
 
   const cargarVehiculos = async () => {
@@ -106,7 +118,18 @@ export default function Profile() {
   };
 
   const guardarPerfil = async () => {
-    setCargandoPerfil(true); setErrPerfil('');
+    setErrPerfil('');
+    const nombre = perfil.nombre_completo?.trim();
+    const tel    = perfil.telefono?.trim();
+
+    if (!nombre)                                          return setErrPerfil('El nombre es obligatorio');
+    if (nombre.length < 3)                                return setErrPerfil('El nombre debe tener al menos 3 caracteres');
+    if (/\d/.test(nombre))                                return setErrPerfil('El nombre no puede contener números');
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(nombre))    return setErrPerfil('El nombre solo puede contener letras');
+    if (tel && !/^\d+$/.test(tel))                        return setErrPerfil('El teléfono solo debe contener números');
+    if (tel && !/^9\d{8}$/.test(tel))                     return setErrPerfil('El teléfono debe empezar con 9 y tener 9 dígitos');
+
+    setCargandoPerfil(true);
     try {
       await updateProfile(perfil);
       setGuardadoPerfil(true);
@@ -117,8 +140,9 @@ export default function Profile() {
 
   const cambiarContrasena = async () => {
     setErrPwd('');
-    if (contrasena.nueva.length < 8) { setErrPwd('Mínimo 8 caracteres'); return; }
-    if (contrasena.nueva !== contrasena.confirmar) { setErrPwd('Las contraseñas no coinciden'); return; }
+    if (!contrasena.actual)                return setErrPwd('Ingresa tu contraseña actual');
+    if (contrasena.nueva.length < 8)       return setErrPwd('La nueva contraseña debe tener al menos 8 caracteres');
+    if (contrasena.nueva !== contrasena.confirmar) return setErrPwd('Las contraseñas no coinciden');
     setCargandoPwd(true);
     try {
       const api = (await import('../../services/api')).default;
@@ -132,12 +156,25 @@ export default function Profile() {
 
   const agregarVehiculo = async () => {
     setErrVeh('');
-    if (!nuevoVehiculo.marca || !nuevoVehiculo.modelo || !nuevoVehiculo.placa) {
-      setErrVeh('Marca, modelo y placa son obligatorios'); return;
-    }
+    const marca  = nuevoVehiculo.marca?.trim();
+    const modelo = nuevoVehiculo.modelo?.trim();
+    const placa  = nuevoVehiculo.placa?.trim().toUpperCase();
+    const anio   = nuevoVehiculo.anio;
+    const cc     = nuevoVehiculo.cilindraje;
+
+    if (!marca)                                           return setErrVeh('La marca es obligatoria');
+    if (!modelo)                                          return setErrVeh('El modelo es obligatorio');
+    if (!placa)                                           return setErrVeh('La placa es obligatoria');
+    if (!/^[A-Z]{3}-\d{3}$/.test(placa))                 return setErrVeh('Placa inválida. Formato: ABC-123');
+    if (anio && !/^\d{4}$/.test(String(anio)))            return setErrVeh('El año debe tener 4 dígitos');
+    if (anio && (parseInt(anio) < 1990 || parseInt(anio) > new Date().getFullYear() + 1))
+                                                          return setErrVeh(`El año debe estar entre 1990 y ${new Date().getFullYear() + 1}`);
+    if (cc && !/^\d+$/.test(String(cc)))                  return setErrVeh('El cilindraje solo acepta números');
+    if (cc && (parseInt(cc) < 50 || parseInt(cc) > 3000)) return setErrVeh('El cilindraje debe estar entre 50 y 3000 cc');
+
     setCargandoVeh(true);
     try {
-      await vehicleService.create(nuevoVehiculo);
+      await vehicleService.create({ ...nuevoVehiculo, placa });
       setNuevoVehiculo({ marca: '', modelo: '', placa: '', cilindraje: '', anio: '', color: '' });
       await cargarVehiculos();
       setGuardadoVeh(true);
@@ -179,182 +216,63 @@ export default function Profile() {
     try { await contactService.delete(id); await cargarContactos(); } catch {}
   };
 
+  const [tab, setTab] = useState('perfil');
   const inicialesUsuario = (currentUser?.nombre_completo || 'U')
     .split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
-  return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
+  const TABS_USUARIO = [
+    { id: 'perfil',    label: 'PERFIL'     },
+    { id: 'seguridad', label: 'CONTRASEÑA' },
+    { id: 'vehiculos', label: 'VEHÍCULOS'  },
+    { id: 'contactos', label: 'CONTACTOS'  },
+  ];
+  const TABS_OTROS = [
+    { id: 'perfil',    label: 'PERFIL'     },
+    { id: 'seguridad', label: 'CONTRASEÑA' },
+  ];
+  const tabs = esUsuario ? TABS_USUARIO : TABS_OTROS;
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
-        <div>
-          <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>MI PERFIL</h1>
-          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>
-            {currentUser?.correo_electronico} ·{' '}
-            <span style={{ color: colores.color }}>{colores.etiqueta}</span>
-          </span>
+  return (
+    <div style={{ padding: '20px 16px 40px', maxWidth: 680, margin: '0 auto' }} className="anim-fade">
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: colores.bg, border: `2px solid ${colores.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: colores.color }}>{inicialesUsuario}</span>
+          </div>
+          <div>
+            <h1 className="display" style={{ fontSize: 26, color: 'var(--text-primary)', lineHeight: 1 }}>{currentUser?.nombre_completo || 'MI PERFIL'}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>{currentUser?.correo_electronico}</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: colores.color, background: colores.bg, border: `1px solid ${colores.border}`, padding: '1px 7px', borderRadius: 4 }}>{colores.etiqueta}</span>
+            </div>
+          </div>
         </div>
-        <ThemeToggle compact />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--accent)', letterSpacing: '0.08em' }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            SALIR
+          </button>
+          <ThemeToggle compact />
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          <Card>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: colores.bg, border: `2px solid ${colores.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ fontFamily: 'Bebas Neue', fontSize: 22, color: colores.color }}>{inicialesUsuario}</span>
-              </div>
-              <div>
-                <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{currentUser?.nombre_completo}</p>
-                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{currentUser?.correo_electronico}</p>
-                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: colores.color, background: colores.bg, border: `1px solid ${colores.border}`, padding: '2px 8px', borderRadius: 4, display: 'inline-block', marginTop: 5 }}>
-                  {colores.etiqueta}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {[
-                ['Plan',  currentUser?.plan_suscripcion || 'básico'],
-                ['Desde', currentUser?.fecha_registro ? new Date(currentUser.fecha_registro).toLocaleDateString('es-PE') : '—'],
-              ].map(([k, v]) => (
-                <div key={k} style={{ padding: '8px 10px', background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 7, color: 'var(--text-muted)', marginBottom: 3 }}>{k.toUpperCase()}</p>
-                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: 'var(--text-secondary)' }}>{v}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card>
-            <Label>DATOS PERSONALES</Label>
-            <CajaError msg={errPerfil} />
-            <CampoInput label="NOMBRE COMPLETO"    valor={perfil.nombre_completo} onChange={v => setPerfil(p => ({ ...p, nombre_completo: v }))} />
-            <CampoInput label="CORREO ELECTRÓNICO" valor={currentUser?.correo_electronico} soloLectura />
-            <CampoInput label="TELÉFONO"           valor={perfil.telefono}  onChange={v => setPerfil(p => ({ ...p, telefono: v }))}  placeholder="+51 9XX XXX XXX" />
-            {esUsuario && (
-              <CampoInput label="DIRECCIÓN" valor={perfil.direccion} onChange={v => setPerfil(p => ({ ...p, direccion: v }))} placeholder="Av. Principal 123, Piura" />
-            )}
-            <BotonGuardar onGuardar={guardarPerfil} guardado={guardadoPerfil} cargando={cargandoPerfil} />
-          </Card>
-
-          <Card>
-            <Label>CAMBIAR CONTRASEÑA</Label>
-            <CajaError msg={errPwd} />
-            <CampoInput label="CONTRASEÑA ACTUAL"          tipo="password" valor={contrasena.actual}    onChange={v => setContrasena(p => ({ ...p, actual: v }))} />
-            <CampoInput label="NUEVA CONTRASEÑA (mín. 8)"  tipo="password" valor={contrasena.nueva}     onChange={v => setContrasena(p => ({ ...p, nueva: v }))} />
-            <CampoInput label="CONFIRMAR NUEVA CONTRASEÑA" tipo="password" valor={contrasena.confirmar} onChange={v => setContrasena(p => ({ ...p, confirmar: v }))} />
-            <BotonGuardar onGuardar={cambiarContrasena} guardado={guardadoPwd} cargando={cargandoPwd} label="CAMBIAR CONTRASEÑA" />
-          </Card>
-
-          <button onClick={logout} style={{ width: '100%', padding: '11px', borderRadius: 10, cursor: 'pointer', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: '0.12em', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            CERRAR SESIÓN
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.1em', whiteSpace: 'nowrap', transition: 'all .18s', flexShrink: 0, background: tab === t.id ? 'var(--accent-soft)' : 'var(--bg-surface)', border: `1px solid ${tab === t.id ? 'var(--accent-border)' : 'var(--border)'}`, color: tab === t.id ? 'var(--accent)' : 'var(--text-muted)' }}>
+            {t.label}
           </button>
-        </div>
+        ))}
+      </div>
 
+      {tab === 'perfil' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          {esUsuario ? (
-            <>
-              <Card>
-                <Label>MIS VEHÍCULOS</Label>
-                <CajaError msg={errVeh} />
-
-                {vehiculos.length === 0 && (
-                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>
-                    Sin vehículos registrados
-                  </p>
-                )}
-
-                {vehiculos.map(v => (
-                  <div key={v.id_vehiculo} style={{ marginBottom: 10 }}>
-                    {editandoVeh?.id_vehiculo === v.id_vehiculo ? (
-                      <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <CampoInput label="MARCA"  valor={editandoVeh.marca}      onChange={val => setEditandoVeh(p => ({ ...p, marca: val }))} />
-                          <CampoInput label="MODELO" valor={editandoVeh.modelo}     onChange={val => setEditandoVeh(p => ({ ...p, modelo: val }))} />
-                          <CampoInput label="PLACA"  valor={editandoVeh.placa}      onChange={val => setEditandoVeh(p => ({ ...p, placa: val }))} />
-                          <CampoInput label="AÑO"    valor={editandoVeh.anio}       onChange={val => setEditandoVeh(p => ({ ...p, anio: val }))} />
-                          <CampoInput label="COLOR"  valor={editandoVeh.color}      onChange={val => setEditandoVeh(p => ({ ...p, color: val }))} />
-                          <CampoInput label="CC"     valor={editandoVeh.cilindraje} onChange={val => setEditandoVeh(p => ({ ...p, cilindraje: val }))} />
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={editarVehiculo} style={{ flex: 2, padding: '9px', background: 'var(--accent)', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', fontFamily: 'JetBrains Mono', fontSize: 9 }}>GUARDAR</button>
-                          <button onClick={() => setEditandoVeh(null)} style={{ flex: 1, padding: '9px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 9 }}>CANCELAR</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <svg viewBox="0 0 32 22" width="24" height="16" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round">
-                            <circle cx="5" cy="17" r="4"/><circle cx="27" cy="17" r="4"/>
-                            <path d="M9 17L14 7L22 7L27 13"/><path d="M9 17L12 17L14 7"/><path d="M12 17L19 17"/>
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{v.marca} {v.modelo}</p>
-                          <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
-                            {v.placa}{v.anio ? ` · ${v.anio}` : ''}{v.color ? ` · ${v.color}` : ''}
-                          </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => setEditandoVeh({ ...v })} style={{ padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 8 }}>EDITAR</button>
-                          <button onClick={() => eliminarVehiculo(v.id_vehiculo)} style={{ padding: '6px 10px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--accent)', fontFamily: 'JetBrains Mono', fontSize: 8 }}>ELIMINAR</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <Divisor />
-                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 10 }}>AGREGAR VEHÍCULO</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <CampoInput label="MARCA*"        valor={nuevoVehiculo.marca}      onChange={v => setNuevoVehiculo(p => ({ ...p, marca: v }))}      placeholder="Kawasaki" />
-                  <CampoInput label="MODELO*"       valor={nuevoVehiculo.modelo}     onChange={v => setNuevoVehiculo(p => ({ ...p, modelo: v }))}     placeholder="Z900"    />
-                  <CampoInput label="PLACA*"        valor={nuevoVehiculo.placa}      onChange={v => setNuevoVehiculo(p => ({ ...p, placa: v }))}      placeholder="ABC-123" />
-                  <CampoInput label="AÑO"           valor={nuevoVehiculo.anio}       onChange={v => setNuevoVehiculo(p => ({ ...p, anio: v }))}       placeholder="2022"    />
-                  <CampoInput label="COLOR"         valor={nuevoVehiculo.color}      onChange={v => setNuevoVehiculo(p => ({ ...p, color: v }))}      placeholder="Negro"   />
-                  <CampoInput label="CILINDRAJE CC" valor={nuevoVehiculo.cilindraje} onChange={v => setNuevoVehiculo(p => ({ ...p, cilindraje: v }))} placeholder="900"     />
-                </div>
-                <BotonGuardar onGuardar={agregarVehiculo} guardado={guardadoVeh} cargando={cargandoVeh} label="+ AGREGAR VEHÍCULO" />
-              </Card>
-
-              <Card>
-                <Label>CONTACTOS DE EMERGENCIA</Label>
-                <CajaError msg={errContacto} />
-                {contactos.length === 0 && (
-                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-faint)', textAlign: 'center', padding: '12px 0' }}>
-                    Sin contactos registrados
-                  </p>
-                )}
-                {contactos.map(c => (
-                  <div key={c.id_contacto} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{c.nombre}</p>
-                      <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{c.telefono}</p>
-                    </div>
-                    <button onClick={() => eliminarContacto(c.id_contacto)} style={{ padding: '5px 10px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--accent)', fontFamily: 'JetBrains Mono', fontSize: 8 }}>
-                      ELIMINAR
-                    </button>
-                  </div>
-                ))}
-                <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <CampoInput label="NOMBRE"   valor={nuevoContacto.nombre}   onChange={v => setNuevoContacto(p => ({ ...p, nombre: v }))}   placeholder="Juan Pérez"      />
-                  <CampoInput label="TELÉFONO" valor={nuevoContacto.telefono} onChange={v => setNuevoContacto(p => ({ ...p, telefono: v }))} placeholder="+51 9XX XXX XXX" />
-                </div>
-                <BotonGuardar onGuardar={agregarContacto} guardado={guardadoContacto} label="+ AGREGAR CONTACTO" />
-              </Card>
-            </>
-          ) : (
+          {!esUsuario && (
             <Card style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
               <Label>INFORMACIÓN DE CUENTA</Label>
               {[
-                ['Rol',    colores.etiqueta                                                        ],
-                ['Correo', currentUser?.correo_electronico || '—'                                 ],
+                ['Rol',    colores.etiqueta],
+                ['Correo', currentUser?.correo_electronico || '—'],
                 ['Desde',  currentUser?.fecha_registro ? new Date(currentUser.fecha_registro).toLocaleDateString('es-PE') : '—'],
                 ...(rol === 'supervisor' && currentUser?.area ? [['Área', currentUser.area]] : []),
               ].map(([k, v]) => (
@@ -365,8 +283,178 @@ export default function Profile() {
               ))}
             </Card>
           )}
+          {esUsuario && (
+            <Card style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                {[
+                  ['PLAN',   currentUser?.plan_suscripcion === 'basico' ? 'Activo' : 'Sin plan', planActivo ? 'var(--green)' : 'var(--text-muted)'],
+                  ['VEHÍCULOS', vehiculos.length, 'var(--cyan)'],
+                  ['CONTACTOS', contactos.length, 'var(--amber)'],
+                  ['DESDE', currentUser?.fecha_registro ? new Date(currentUser.fecha_registro).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—', 'var(--text-secondary)'],
+                ].map(([k, v, c]) => (
+                  <div key={k} style={{ padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 7, color: 'var(--text-muted)', marginBottom: 4, letterSpacing: '0.1em' }}>{k}</p>
+                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: c, fontWeight: 600, lineHeight: 1 }}>{v}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+          <Card>
+            <Label>DATOS PERSONALES</Label>
+            <CajaError msg={errPerfil} />
+            <CampoInput label="NOMBRE COMPLETO" valor={perfil.nombre_completo}
+              onChange={v => setPerfil(p => ({ ...p, nombre_completo: v.replace(/[0-9!@#$%^&*()_+=[\]{};':"\\|,.<>/?]/g, '') }))} />
+            <CampoInput label="CORREO ELECTRÓNICO" valor={currentUser?.correo_electronico} soloLectura />
+            <CampoInput label="TELÉFONO" valor={perfil.telefono}
+              onChange={v => setPerfil(p => ({ ...p, telefono: v.replace(/\D/g, '').slice(0, 9) }))}
+              placeholder="9XXXXXXXX"
+              filtro={v => v.replace(/\D/g, '').slice(0, 9)} />
+            {esUsuario && (
+              <CampoInput label="DIRECCIÓN" valor={perfil.direccion}
+                onChange={v => setPerfil(p => ({ ...p, direccion: v }))}
+                placeholder="Av. Principal 123, Piura" />
+            )}
+            <BotonGuardar onGuardar={guardarPerfil} guardado={guardadoPerfil} cargando={cargandoPerfil} />
+          </Card>
         </div>
-      </div>
+      )}
+
+      {tab === 'seguridad' && (
+        <Card>
+          <Label>CAMBIAR CONTRASEÑA</Label>
+          <CajaError msg={errPwd} />
+          <CampoInput label="CONTRASEÑA ACTUAL"          tipo="password" valor={contrasena.actual}    onChange={v => setContrasena(p => ({ ...p, actual: v }))} />
+          <CampoInput label="NUEVA CONTRASEÑA (mín. 8)"  tipo="password" valor={contrasena.nueva}     onChange={v => setContrasena(p => ({ ...p, nueva: v }))}     placeholder="Mínimo 8 caracteres" />
+          <CampoInput label="CONFIRMAR NUEVA CONTRASEÑA" tipo="password" valor={contrasena.confirmar} onChange={v => setContrasena(p => ({ ...p, confirmar: v }))} placeholder="Repite la nueva contraseña" />
+          {contrasena.nueva && contrasena.confirmar && contrasena.nueva !== contrasena.confirmar && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: -8, marginBottom: 12 }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--accent)' }}>Las contraseñas no coinciden</span>
+            </div>
+          )}
+          <BotonGuardar onGuardar={cambiarContrasena} guardado={guardadoPwd} cargando={cargandoPwd} label="CAMBIAR CONTRASEÑA" />
+        </Card>
+      )}
+
+      {tab === 'vehiculos' && esUsuario && (
+        <Card>
+          <Label>MIS VEHÍCULOS</Label>
+          <CajaError msg={errVeh} />
+          {vehiculos.length === 0 && (
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>Sin vehículos registrados</p>
+          )}
+          {vehiculos.map(v => (
+            <div key={v.id_vehiculo} style={{ marginBottom: 10 }}>
+              {editandoVeh?.id_vehiculo === v.id_vehiculo ? (
+                <div style={{ padding: 14, background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                    <CampoInput label="MARCA"  valor={editandoVeh.marca}      onChange={val => setEditandoVeh(p => ({ ...p, marca: val }))} />
+                    <CampoInput label="MODELO" valor={editandoVeh.modelo}     onChange={val => setEditandoVeh(p => ({ ...p, modelo: val }))} />
+                    <CampoInput label="PLACA"  valor={editandoVeh.placa}      onChange={val => setEditandoVeh(p => ({ ...p, placa: val.toUpperCase() }))} placeholder="ABC-123" />
+                    <CampoInput label="AÑO"    valor={editandoVeh.anio}       onChange={val => setEditandoVeh(p => ({ ...p, anio: val.replace(/\D/g, '').slice(0,4) }))} />
+                    <CampoInput label="COLOR"  valor={editandoVeh.color}      onChange={val => setEditandoVeh(p => ({ ...p, color: val.replace(/[0-9]/g, '') }))} />
+                    <CampoInput label="CC"     valor={editandoVeh.cilindraje} onChange={val => setEditandoVeh(p => ({ ...p, cilindraje: val.replace(/\D/g, '') }))} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={editarVehiculo} style={{ flex: 2, padding: '9px', background: 'var(--accent)', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', fontFamily: 'JetBrains Mono', fontSize: 9 }}>GUARDAR</button>
+                    <button onClick={() => setEditandoVeh(null)} style={{ flex: 1, padding: '9px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 9 }}>CANCELAR</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg viewBox="0 0 32 22" width="22" height="15" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round">
+                      <circle cx="5" cy="17" r="4"/><circle cx="27" cy="17" r="4"/>
+                      <path d="M9 17L14 7L22 7L27 13"/><path d="M9 17L12 17L14 7"/><path d="M12 17L19 17"/>
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{v.marca} {v.modelo}</p>
+                    <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {v.placa}{v.anio ? ` · ${v.anio}` : ''}{v.color ? ` · ${v.color}` : ''}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => setEditandoVeh({ ...v })} style={{ padding: '5px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 8 }}>EDITAR</button>
+                    <button onClick={() => eliminarVehiculo(v.id_vehiculo)} style={{ padding: '5px 8px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <Divisor />
+          {!planActivo && vehiculos.length >= 1 ? (
+            <div style={{ padding: '12px 14px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--accent)' }}>
+                Plan gratuito: máximo 1 vehículo.{' '}
+                <button onClick={() => window.location.href='/plan'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontFamily: 'JetBrains Mono', fontSize: 9, padding: 0, textDecoration: 'underline' }}>Activa el plan →</button>
+              </p>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: 10 }}>AGREGAR VEHÍCULO</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                <CampoInput label="MARCA*"        valor={nuevoVehiculo.marca}      onChange={v => setNuevoVehiculo(p => ({ ...p, marca: v }))}      placeholder="Kawasaki" />
+                <CampoInput label="MODELO*"       valor={nuevoVehiculo.modelo}     onChange={v => setNuevoVehiculo(p => ({ ...p, modelo: v }))}     placeholder="Z900"    />
+                <CampoInput label="PLACA*"        valor={nuevoVehiculo.placa}      onChange={v => setNuevoVehiculo(p => ({ ...p, placa: v.toUpperCase() }))} placeholder="ABC-123" />
+                <CampoInput label="AÑO"           valor={nuevoVehiculo.anio}       onChange={v => setNuevoVehiculo(p => ({ ...p, anio: v.replace(/\D/g, '').slice(0, 4) }))} placeholder="2022" />
+                <CampoInput label="COLOR"         valor={nuevoVehiculo.color}      onChange={v => setNuevoVehiculo(p => ({ ...p, color: v.replace(/[0-9]/g, '') }))} placeholder="Negro" />
+                <CampoInput label="CILINDRAJE CC" valor={nuevoVehiculo.cilindraje} onChange={v => setNuevoVehiculo(p => ({ ...p, cilindraje: v.replace(/\D/g, '') }))} placeholder="900" />
+              </div>
+              <BotonGuardar onGuardar={agregarVehiculo} guardado={guardadoVeh} cargando={cargandoVeh} label="+ AGREGAR VEHÍCULO" />
+            </>
+          )}
+        </Card>
+      )}
+
+      {tab === 'contactos' && esUsuario && (
+        <Card>
+          <Label>CONTACTOS DE EMERGENCIA</Label>
+          <CajaError msg={errContacto} />
+          {contactos.length === 0 && (
+            <p style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-faint)', textAlign: 'center', padding: '12px 0' }}>Sin contactos registrados</p>
+          )}
+          {contactos.map(c => (
+            <div key={c.id_contacto} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{c.nombre}</p>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{c.telefono}</p>
+              </div>
+              <button onClick={() => eliminarContacto(c.id_contacto)} style={{ padding: '5px 8px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              </button>
+            </div>
+          ))}
+          {!planActivo && contactos.length >= 1 ? (
+            <div style={{ padding: '10px 14px', background: 'var(--amber-soft)', border: '1px solid var(--amber-border)', borderRadius: 8, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--amber)' }}>
+                Plan gratuito: máximo 1 contacto.{' '}
+                <button onClick={() => window.location.href='/plan'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--amber)', fontFamily: 'JetBrains Mono', fontSize: 9, padding: 0, textDecoration: 'underline' }}>Activa el plan →</button>
+              </p>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+                <CampoInput label="NOMBRE*"   valor={nuevoContacto.nombre}
+                  onChange={v => setNuevoContacto(p => ({ ...p, nombre: v.replace(/[0-9]/g, '') }))}
+                  placeholder="Juan Pérez" />
+                <CampoInput label="TELÉFONO*" valor={nuevoContacto.telefono}
+                  onChange={v => setNuevoContacto(p => ({ ...p, telefono: v.replace(/\D/g, '').slice(0, 9) }))}
+                  placeholder="9XXXXXXXX" />
+              </div>
+              <BotonGuardar onGuardar={agregarContacto} guardado={guardadoContacto} label="+ AGREGAR CONTACTO" />
+            </>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

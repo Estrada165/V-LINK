@@ -14,6 +14,7 @@ const ESTADO_CFG = {
   archivado: { color: 'var(--text-muted)', bg: 'var(--bg-surface)', border: 'var(--border)', label: 'ARCHIVADO' },
 };
 
+/* ── Modal ver informe completo ─────────────────────────────── */
 function InformeModal({ informe, onClose, onEstadoChange, soloLectura = false }) {
   const [loading, setLoading] = useState(false);
   const ec = ESTADO_CFG[informe.estado] || ESTADO_CFG.enviado;
@@ -51,7 +52,7 @@ function InformeModal({ informe, onClose, onEstadoChange, soloLectura = false })
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, margin: '14px 0', padding: '12px 14px', background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, margin: '14px 0', padding: '12px 14px', background: 'var(--bg-surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
             {[
               { label: 'PERÍODO', value: `${fmtDate(informe.periodo_desde)} → ${fmtDate(informe.periodo_hasta)}` },
               { label: 'INCIDENCIAS', value: informe.incidencias_count || 0 },
@@ -104,6 +105,7 @@ function InformeModal({ informe, onClose, onEstadoChange, soloLectura = false })
   );
 }
 
+/* ── Informes — página principal ────────────────────────────── */
 export default function Informes() {
   const { currentUser } = useAuth();
   const esSupervisor = currentUser?.rol === 'supervisor';
@@ -133,6 +135,7 @@ export default function Informes() {
 
   const safeInformes = Array.isArray(informes) ? informes : [];
 
+  // Supervisores únicos para filtro
   const supervisores = [...new Map(safeInformes.map(i => [i.id_autor, i.usuario])).entries()]
     .map(([id, u]) => ({ id, nombre: u?.nombre_completo || `Supervisor ${id}` }));
 
@@ -146,7 +149,7 @@ export default function Informes() {
   const revisados  = safeInformes.filter(i => i.estado === 'revisado').length;
 
   return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
+    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
@@ -340,7 +343,7 @@ function ModalCrearInforme({ onClose, onCreado }) {
                 onFocus={e => e.target.style.borderColor = 'var(--amber-border)'}
                 onBlur={e  => e.target.style.borderColor = 'var(--border)'} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <div>
                 <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.1em' }}>PERÍODO DESDE</p>
                 <input type="date" value={form.periodo_desde} onChange={e => set('periodo_desde', e.target.value)} style={estiloInput} />

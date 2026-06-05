@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AnimatedRing from '../../components/ring/AnimatedRing';
 import ThemeToggle from '../../components/ui/ThemeToggle';
-import { vehicleService, configService } from '../../services/api';
+import { vehicleService, configService, planService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,14 +15,18 @@ const Label = ({ children }) => (
 
 const Divisor = () => <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />;
 
-const Toggle = ({ value, onChange, color = 'var(--accent)' }) => (
+const Toggle = ({ value, onChange }) => (
   <button onClick={() => onChange(!value)} style={{
-    width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-    background: value ? color : 'var(--border-mid, #2a2a2a)',
-    position: 'relative', transition: 'background .28s', flexShrink: 0,
-    boxShadow: value ? `0 0 8px ${color}55` : 'none',
+    padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    background: value ? 'var(--green-soft)' : 'var(--bg-surface)',
+    border: `1px solid ${value ? 'var(--green-border)' : 'var(--border)'}`,
+    fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.08em',
+    color: value ? 'var(--green)' : 'var(--text-muted)',
+    display: 'flex', alignItems: 'center', gap: 6,
+    transition: 'all .2s', flexShrink: 0,
   }}>
-    <div style={{ position: 'absolute', top: 3, left: value ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .25s ease' }} />
+    <div style={{ width: 6, height: 6, borderRadius: '50%', background: value ? 'var(--green)' : 'var(--text-faint)', transition: 'background .2s' }} />
+    {value ? 'ACTIVADO' : 'DESACTIVADO'}
   </button>
 );
 
@@ -77,15 +81,15 @@ const SeccionNotificaciones = ({ alertas, setAlertas, gps, setGps }) => (
   <Card>
     <Label>NOTIFICACIONES</Label>
     {[
-      { label: 'Alertas de movimiento', sub: 'Notificar cuando se detecte vibración o desplazamiento', val: alertas, set: setAlertas, color: 'var(--accent)' },
-      { label: 'Rastreo GPS continuo',  sub: 'Actualización de ubicación cada 5 segundos',             val: gps,     set: setGps,    color: 'var(--green)' },
+      { label: 'Alertas de movimiento', sub: 'Notificar cuando se detecte vibración o desplazamiento', val: alertas, set: setAlertas },
+      { label: 'Rastreo GPS continuo',  sub: 'Actualización de ubicación cada 5 segundos',             val: gps,     set: setGps    },
     ].map((item, i, arr) => (
-      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-        <div>
+      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '13px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{item.label}</p>
           <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>{item.sub}</p>
         </div>
-        <Toggle value={item.val} onChange={item.set} color={item.color} />
+        <Toggle value={item.val} onChange={item.set} />
       </div>
     ))}
   </Card>
@@ -228,7 +232,7 @@ const SeccionSensores = ({ distancia, setDistancia, demora, setDemora, brillo, s
   </Card>
 );
 
-const DOS_COLUMNAS = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' };
+const DOS_COLUMNAS = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, alignItems: 'start' };
 
 function SettingsTecnico() {
   return (
@@ -284,6 +288,7 @@ function SettingsUsuario() {
   const [guardadoCfg,  setGuardadoCfg]  = useState(false);
   const [cargandoCfg,  setCargandoCfg]  = useState(false);
   const [estadoBle,    setEstadoBle]    = useState('disconnected');
+  const [planActivo,   setPlanActivo]   = useState(false);
 
   const modosAnillo = [
     { key: 'armed',     label: 'Armado',     hex: 'var(--accent)'     },
@@ -292,14 +297,17 @@ function SettingsUsuario() {
     { key: 'emergency', label: 'Emergencia', hex: '#ff2222'           },
   ];
 
-
   useEffect(() => {
     const cargar = async () => {
       setCargandoVehs(true);
       try {
-        const vehs = await vehicleService.getMine();
+        const [vehs, plan] = await Promise.all([
+          vehicleService.getMine(),
+          planService.estado().catch(() => null),
+        ]);
         setVehiculos(vehs || []);
         if (vehs?.length > 0) setVehiculoSel(vehs[0]);
+        setPlanActivo(plan?.activo === true);
       } catch (e) { console.error(e); }
       setCargandoVehs(false);
     };
@@ -403,12 +411,29 @@ function SettingsUsuario() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <SeccionBle estadoBle={estadoBle} manejarBle={manejarBle} vehiculoSel={vehiculoSel} />
 
-          {vehiculoSel && (
+          {vehiculoSel && !planActivo && (
+            <div style={{ padding: '16px 18px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <div>
+                <p style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--accent)', marginBottom: 4 }}>CONFIGURACIÓN BLOQUEADA</p>
+                <p style={{ fontFamily: 'DM Sans', fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  La configuración del anillo IoT requiere un plan activo.
+                </p>
+                <button onClick={() => navigate('/plan')} style={{ padding: '6px 14px', background: 'var(--accent)', border: 'none', borderRadius: 7, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, color: '#fff', letterSpacing: '0.06em' }}>
+                  ACTIVAR PLAN →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {vehiculoSel && planActivo && (
             <Card>
               <Label>MODO DE SEGURIDAD — {vehiculoSel.marca} {vehiculoSel.modelo}</Label>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
                 <AnimatedRing status={modoAnillo} size={160} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, width: '100%' }}>
                   {modosAnillo.map(m => (
                     <button key={m.key} onClick={() => setModoAnillo(m.key)} style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 9, letterSpacing: '0.1em', transition: 'all .2s', background: modoAnillo === m.key ? 'var(--accent-soft)' : 'var(--bg-surface)', border: `1px solid ${modoAnillo === m.key ? 'var(--accent-border)' : 'var(--border)'}`, color: modoAnillo === m.key ? m.hex : 'var(--text-muted)' }}>
                       {m.label.toUpperCase()}
@@ -424,7 +449,7 @@ function SettingsUsuario() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {vehiculoSel && (
+          {vehiculoSel && planActivo && (
             <SeccionSensores
               distancia={distancia} setDistancia={setDistancia}
               demora={demora}       setDemora={setDemora}
@@ -454,7 +479,7 @@ function SettingsUsuario() {
             </Card>
           )}
 
-          {vehiculoSel && (
+          {vehiculoSel && planActivo && (
             <BotonGuardar onGuardar={guardarConfig} guardado={guardadoCfg} cargando={cargandoCfg} label="GUARDAR CONFIGURACIÓN" />
           )}
         </div>
@@ -477,7 +502,7 @@ export default function Settings() {
   const etiqueta = ETIQUETAS_ROL[rol] || { label: 'Ajustes', color: 'var(--text-muted)' };
 
   return (
-    <div style={{ padding: '24px 28px' }} className="anim-fade">
+    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
           <h1 className="display" style={{ fontSize: 30, color: 'var(--text-primary)', lineHeight: 1 }}>AJUSTES</h1>

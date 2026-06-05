@@ -59,7 +59,7 @@ const ESTADOS_ALERTA     = ['activo', 'resuelto'];
 const ESTADOS_INFORME    = ['enviado', 'revisado', 'archivado'];
 const CAMPOS_VEHICULO    = ['marca', 'modelo', 'placa', 'cilindraje', 'anio', 'color'];
 const TABLAS_BACKUP      = ['usuario', 'vehiculo', 'alerta', 'ruta', 'contacto_emergencia', 'configuracion_sistema'];
-const BCRYPT_ROUNDS      = 8;
+const BCRYPT_ROUNDS      = 10;
 const DUMMY_HASH         = '$2b$10$rhRAZMCBeKFz9J9EHJs3wO.sx0HVeNaLpVbNrDDlPCb0l9AKP3MjS';
 const CONFIG_DEFAULTS    = {
   modo_seguridad:      'armado',
@@ -646,9 +646,8 @@ app.get('/api/alerts', requireAuth, async (req, res) => {
 app.post('/api/alerts', requireAuth, async (req, res) => {
   const { id_vehiculo, tipo_incidencia, latitud, longitud } = req.body;
 
-  if (!tipo_incidencia || latitud === undefined || longitud === undefined) {
+  if (!tipo_incidencia || latitud === undefined || longitud === undefined)
     return res.status(400).json({ error: 'tipo_incidencia, latitud y longitud son obligatorios' });
-  }
 
   const { data, error } = await supabase
     .from('alerta')
@@ -657,15 +656,15 @@ app.post('/api/alerts', requireAuth, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: 'Error al registrar alerta' });
+  await registrarAccion(req.user.id, 'reportar_incidencia', `${tipo_incidencia} en [${latitud?.toFixed(4)}, ${longitud?.toFixed(4)}]`, req);
   res.status(201).json(data);
 });
 
 app.patch('/api/alerts/:id', requireAuth, requireSupervisor, async (req, res) => {
   const { estado_alerta } = req.body;
 
-  if (!ESTADOS_ALERTA.includes(estado_alerta)) {
+  if (!ESTADOS_ALERTA.includes(estado_alerta))
     return res.status(400).json({ error: 'Estado inválido' });
-  }
 
   const { data, error } = await supabase
     .from('alerta')
@@ -957,8 +956,22 @@ app.post('/api/tickets', requireAuth, async (req, res) => {
 
   if (!tipo || !titulo || !descripcion)
     return res.status(400).json({ error: 'Tipo, título y descripción son obligatorios' });
+  if (titulo.trim().length < 5)
+    return res.status(400).json({ error: 'El título debe tener al menos 5 caracteres' });
+  if (descripcion.trim().length < 10)
+    return res.status(400).json({ error: 'La descripción debe tener al menos 10 caracteres' });
   if (!TIPOS_TICKET.includes(tipo))
     return res.status(400).json({ error: 'Tipo de ticket inválido' });
+
+  const { data: usr } = await supabase
+    .from('usuario')
+    .select('plan_suscripcion, fecha_fin_plan')
+    .eq('id_usuario', req.user.id)
+    .single();
+
+  const ahora      = new Date();
+  const planActivo = usr?.plan_suscripcion === 'basico' && usr?.fecha_fin_plan && new Date(usr.fecha_fin_plan) > ahora;
+  const prioridad  = planActivo ? 'media' : 'baja';
 
   const { data, error } = await supabase
     .from('ticket_soporte')
@@ -966,16 +979,16 @@ app.post('/api/tickets', requireAuth, async (req, res) => {
       id_usuario_afectado: req.user.id,
       id_vehiculo:         id_vehiculo || null,
       tipo,
-      titulo,
-      descripcion,
-      estado:   'pendiente',
-      prioridad: 'media',
+      titulo:      titulo.trim(),
+      descripcion: descripcion.trim(),
+      estado:      'pendiente',
+      prioridad,
     }])
     .select()
     .single();
 
   if (error) return res.status(500).json({ error: 'Error al crear ticket' });
-  await registrarAccion(req.user.id, 'crear_ticket', `Ticket: ${titulo}`, req);
+  await registrarAccion(req.user.id, 'crear_ticket', `Ticket: ${titulo} [${prioridad}]`, req);
   res.status(201).json(data);
 });
 
@@ -1076,6 +1089,186 @@ app.patch('/api/admin/users/:id/area', requireAuth, requireSupervisor, async (re
   if (error) return res.status(500).json({ error: 'Error al actualizar área' });
   await registrarAccion(req.user.id, 'actualizar_area', `Usuario #${req.params.id} → área: ${area || 'sin área'}`, req);
   res.json(data);
+});
+
+/* ── PLANES DE SUSCRIPCIÓN ─────────────────────────────────── */
+
+const PRECIO_PLAN = 29.90;
+const NOMBRE_PLAN = 'Plan MOTOGUARD';
+
+const calcularFechaFin = (desde) => {
+  const fecha  = new Date(desde);
+  const mes    = fecha.getMonth();
+  const anio   = fecha.getFullYear();
+  const dia    = fecha.getDate();
+  const sigMes  = mes === 11 ? 0 : mes + 1;
+  const sigAnio = mes === 11 ? anio + 1 : anio;
+  const ultimoDia = new Date(sigAnio, sigMes + 1, 0).getDate();
+  return new Date(sigAnio, sigMes, Math.min(dia, ultimoDia), 23, 59, 59);
+};
+
+const diasRestantes = (fechaFin) => {
+  const diff = new Date(fechaFin) - new Date();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+};
+
+const generarReferencia = () =>
+  'MG-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+app.get('/api/plan/estado', requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('usuario')
+    .select('plan_suscripcion, fecha_inicio_plan, fecha_fin_plan')
+    .eq('id_usuario', req.user.id)
+    .single();
+
+  if (error) return res.status(500).json({ error: 'Error al obtener plan' });
+
+  const diasQuedan = data.fecha_fin_plan ? diasRestantes(data.fecha_fin_plan) : 0;
+  const activo     = data.plan_suscripcion === 'basico' && diasQuedan > 0;
+
+  res.json({
+    plan:             data.plan_suscripcion,
+    activo,
+    por_vencer:       activo && diasQuedan <= 7,
+    dias_restantes:   diasQuedan,
+    fecha_inicio:     data.fecha_inicio_plan,
+    fecha_fin:        data.fecha_fin_plan,
+    fecha_renovacion: data.fecha_fin_plan,
+    precio:           PRECIO_PLAN,
+    nombre_plan:      NOMBRE_PLAN,
+  });
+});
+
+app.post('/api/plan/simular-pago', requireAuth, async (req, res) => {
+  const { tipo, metodo_pago } = req.body;
+
+  if (!metodo_pago) return res.status(400).json({ error: 'Método de pago requerido' });
+
+  const METODOS_VALIDOS = ['yape', 'plin', 'visa', 'mastercard', 'bcp', 'interbank'];
+  if (!METODOS_VALIDOS.includes(metodo_pago))
+    return res.status(400).json({ error: 'Método de pago inválido' });
+
+  const { data: usuario, error: errUser } = await supabase
+    .from('usuario')
+    .select('plan_suscripcion, fecha_fin_plan, rol')
+    .eq('id_usuario', req.user.id)
+    .single();
+
+  if (errUser) return res.status(500).json({ error: 'Error al obtener usuario' });
+  if (usuario.rol !== 'usuario') return res.status(403).json({ error: 'Solo usuarios pueden adquirir planes' });
+
+  const ahora    = new Date();
+  const base     = tipo === 'renovar' && usuario.fecha_fin_plan ? new Date(usuario.fecha_fin_plan) : ahora;
+  const fechaFin = calcularFechaFin(base);
+  const referencia = generarReferencia();
+
+  const { error: errPlan } = await supabase
+    .from('usuario')
+    .update({
+      plan_suscripcion:  'basico',
+      fecha_inicio_plan: ahora.toISOString(),
+      fecha_fin_plan:    fechaFin.toISOString(),
+    })
+    .eq('id_usuario', req.user.id);
+
+  if (errPlan) return res.status(500).json({ error: 'Error al activar plan' });
+
+  await supabase.from('pago').insert({
+    id_usuario:     req.user.id,
+    monto:          PRECIO_PLAN,
+    metodo_pago,
+    estado_pago:    'completado',
+    tipo_operacion: tipo === 'renovar' ? 'renovacion' : 'activacion',
+    referencia,
+    fecha_pago:     ahora.toISOString(),
+  });
+
+  await registrarAccion(
+    req.user.id,
+    tipo === 'renovar' ? 'renovar_plan' : 'activar_plan',
+    `S/. ${PRECIO_PLAN} via ${metodo_pago} — ref: ${referencia}`,
+    req
+  );
+
+  res.json({
+    ok:           true,
+    mensaje:      tipo === 'renovar' ? 'Plan renovado correctamente' : '¡Plan activado! Bienvenido a MOTOGUARD',
+    fecha_fin:    fechaFin.toISOString(),
+    dias_activos: diasRestantes(fechaFin),
+    referencia,
+    monto:        PRECIO_PLAN,
+    metodo_pago,
+  });
+});
+
+app.post('/api/plan/cancelar', requireAuth, async (req, res) => {
+  const { error } = await supabase
+    .from('usuario')
+    .update({ plan_suscripcion: 'sin_plan', fecha_inicio_plan: null, fecha_fin_plan: null })
+    .eq('id_usuario', req.user.id);
+
+  if (error) return res.status(500).json({ error: 'Error al cancelar plan' });
+  await registrarAccion(req.user.id, 'cancelar_plan', 'Plan cancelado por el usuario', req);
+  res.json({ ok: true, mensaje: 'Plan cancelado' });
+});
+
+app.get('/api/admin/pagos', requireAuth, requireSupervisor, async (req, res) => {
+  const { search, metodo, desde, hasta } = req.query;
+
+  let q = supabase
+    .from('pago')
+    .select(`
+      id_pago, monto, metodo_pago, estado_pago, tipo_operacion,
+      referencia, fecha_pago,
+      usuario:usuario!id_usuario(id_usuario, nombre_completo, correo_electronico, plan_suscripcion, fecha_fin_plan)
+    `)
+    .order('fecha_pago', { ascending: false })
+    .limit(100);
+
+  if (metodo) q = q.eq('metodo_pago', metodo);
+  if (desde)  q = q.gte('fecha_pago', desde);
+  if (hasta)  q = q.lte('fecha_pago', hasta);
+
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: 'Error al obtener pagos' });
+
+  const filtrado = search
+    ? data.filter(p =>
+        p.usuario?.nombre_completo?.toLowerCase().includes(search.toLowerCase()) ||
+        p.usuario?.correo_electronico?.toLowerCase().includes(search.toLowerCase()) ||
+        p.referencia?.toLowerCase().includes(search.toLowerCase())
+      )
+    : data;
+
+  const totalRecaudado = filtrado.reduce((s, p) => s + parseFloat(p.monto), 0);
+
+  res.json({ pagos: filtrado, total_recaudado: totalRecaudado, count: filtrado.length });
+});
+
+app.get('/api/admin/suscripciones', requireAuth, requireSupervisor, async (req, res) => {
+  const { data, error } = await supabase
+    .from('usuario')
+    .select('id_usuario, nombre_completo, correo_electronico, plan_suscripcion, fecha_inicio_plan, fecha_fin_plan, activo')
+    .eq('rol', 'usuario')
+    .order('fecha_inicio_plan', { ascending: false });
+
+  if (error) return res.status(500).json({ error: 'Error al obtener suscripciones' });
+
+  const ahora    = new Date();
+  const activos  = data.filter(u => u.plan_suscripcion === 'basico' && u.fecha_fin_plan && new Date(u.fecha_fin_plan) > ahora);
+  const vencidos = data.filter(u => u.plan_suscripcion === 'basico' && u.fecha_fin_plan && new Date(u.fecha_fin_plan) <= ahora);
+  const sinPlan  = data.filter(u => u.plan_suscripcion !== 'basico');
+
+  res.json({
+    usuarios:          data,
+    stats: {
+      activos:         activos.length,
+      vencidos:        vencidos.length,
+      sin_plan:        sinPlan.length,
+      total_usuarios:  data.length,
+    }
+  });
 });
 
 const PORT = process.env.PORT || 4000;
