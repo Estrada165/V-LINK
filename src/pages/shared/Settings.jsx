@@ -182,7 +182,7 @@ const SeccionBle = ({ estadoBle, manejarBle, vehiculoSel }) => (
   </Card>
 );
 
-const SeccionSensores = ({ distancia, setDistancia, demora, setDemora, brillo, setBrillo }) => (
+const SeccionSensores = ({ distancia, setDistancia, demora, setDemora }) => (
   <Card>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
       <Label>PARÁMETROS DEL DISPOSITIVO</Label>
@@ -207,7 +207,7 @@ const SeccionSensores = ({ distancia, setDistancia, demora, setDemora, brillo, s
 
     <Divisor />
 
-    <div style={{ marginBottom: 16 }}>
+    <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
         <div>
           <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Demora antes de activar relay</p>
@@ -218,16 +218,6 @@ const SeccionSensores = ({ distancia, setDistancia, demora, setDemora, brillo, s
         <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: 'var(--cyan)', alignSelf: 'center' }}>{demora} s</span>
       </div>
       <Slider value={demora} onChange={setDemora} min={1} max={30} unit=" s" />
-    </div>
-
-    <Divisor />
-
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-        <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Brillo del anillo LED</p>
-        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: 'var(--text-secondary)' }}>{brillo}%</span>
-      </div>
-      <Slider value={brillo} onChange={setBrillo} min={10} max={100} unit="%" />
     </div>
   </Card>
 );
@@ -282,7 +272,6 @@ function SettingsUsuario() {
   const [modoAnillo,   setModoAnillo]   = useState('armed');
   const [distancia,    setDistancia]    = useState(5);
   const [demora,       setDemora]       = useState(5);
-  const [brillo,       setBrillo]       = useState(70);
   const [alertas,      setAlertas]      = useState(true);
   const [gps,          setGps]          = useState(true);
   const [guardadoCfg,  setGuardadoCfg]  = useState(false);
@@ -317,7 +306,7 @@ function SettingsUsuario() {
   useEffect(() => {
     if (!vehiculoSel) return;
     const cargarConfig = async () => {
-      setModoAnillo('armed'); setDistancia(5); setDemora(5); setBrillo(70); setAlertas(true); setGps(true);
+      setModoAnillo('armed'); setDistancia(5); setDemora(5); setAlertas(true); setGps(true);
       try {
         const cfg = await configService.get(vehiculoSel.id_vehiculo);
         if (cfg.modo_seguridad)                   setModoAnillo(MAPA_MODO_UI[cfg.modo_seguridad] || 'armed');
@@ -453,7 +442,6 @@ function SettingsUsuario() {
             <SeccionSensores
               distancia={distancia} setDistancia={setDistancia}
               demora={demora}       setDemora={setDemora}
-              brillo={brillo}       setBrillo={setBrillo}
             />
           )}
 

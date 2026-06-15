@@ -1091,7 +1091,119 @@ app.patch('/api/admin/users/:id/area', requireAuth, requireSupervisor, async (re
   res.json(data);
 });
 
-/* ── PLANES DE SUSCRIPCIÓN ─────────────────────────────────── */
+/* ── DISPOSITIVO IoT — ESP32 ───────────────────────────────── */
+
+app.get('/api/devices/estado', requireAuth, async (req, res) => {
+  const { data: vehs } = await supabase
+    .from('vehiculo')
+    .select('id_vehiculo')
+    .eq('id_usuario', req.user.id);
+
+  if (!vehs?.length) return res.json(null);
+
+  const ids = vehs.map(v => v.id_vehiculo);
+
+  const { data: disp } = await supabase
+    .from('dispositivo_iot')
+    .select('mac_address, estado, ultimo_ping, bateria_pct')
+    .in('id_vehiculo', ids)
+    .order('ultimo_ping', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!disp) return res.json(null);
+
+  const ahora      = new Date();
+  const ultimoPing = disp.ultimo_ping ? new Date(disp.ultimo_ping) : null;
+  const segsDesde  = ultimoPing ? Math.floor((ahora - ultimoPing) / 1000) : null;
+  const conectado  = segsDesde !== null && segsDesde < 15;
+
+  res.json({
+    mac_address: disp.mac_address,
+    conectado,
+    ultimo_ping: disp.ultimo_ping,
+    bateria_pct: disp.bateria_pct,
+    segs_desde:  segsDesde,
+  });
+});
+
+app.post('/api/devices/ping', async (req, res) => {
+  const { mac, id_vehiculo, bateria_pct } = req.body;
+
+  if (!mac) return res.status(400).json({ error: 'MAC requerida' });
+
+  const { error } = await supabase
+    .from('dispositivo_iot')
+    .upsert({
+      mac_address:     mac,
+      id_vehiculo:     id_vehiculo || null,
+      bateria_pct:     bateria_pct ?? null,
+      ultimo_ping:     new Date().toISOString(),
+      estado:          'conectado',
+    }, { onConflict: 'mac_address' });
+
+  if (error) return res.status(500).json({ error: 'Error al registrar ping' });
+  res.json({ ok: true, timestamp: new Date().toISOString() });
+});
+
+app.post('/api/devices/telemetria', async (req, res) => {
+  const { mac, latitud, longitud, velocidad } = req.body;
+
+  if (!mac || latitud === undefined || longitud === undefined)
+    return res.status(400).json({ error: 'mac, latitud y longitud son obligatorios' });
+
+  const { data: dispositivo } = await supabase
+    .from('dispositivo_iot')
+    .select('id_dispositivo, id_vehiculo')
+    .eq('mac_address', mac)
+    .single();
+
+  const { error } = await supabase
+    .from('punto_telemetria')
+    .insert({
+      id_dispositivo: dispositivo?.id_dispositivo || null,
+      id_vehiculo:    dispositivo?.id_vehiculo    || null,
+      latitud,
+      longitud,
+      velocidad:      velocidad ?? 0,
+      fecha_hora:     new Date().toISOString(),
+    });
+
+  if (error) return res.status(500).json({ error: 'Error al guardar telemetría' });
+  res.json({ ok: true });
+});
+
+app.get('/api/devices/config/:mac', async (req, res) => {
+  const { mac } = req.params;
+
+  const { data: dispositivo } = await supabase
+    .from('dispositivo_iot')
+    .select('id_vehiculo')
+    .eq('mac_address', mac)
+    .single();
+
+  if (!dispositivo?.id_vehiculo)
+    return res.json({
+      modo:         'armado',
+      relay_activo: false,
+      umbral_ms:    5000,
+      distancia_cm: 300,
+    });
+
+  const { data: config } = await supabase
+    .from('configuracion_sistema')
+    .select('modo_seguridad, umbral_apagado_ms, radio_proximidad_cm, alertas_movimiento')
+    .eq('id_vehiculo', dispositivo.id_vehiculo)
+    .single();
+
+  res.json({
+    modo:           config?.modo_seguridad       || 'armado',
+    relay_activo:   config?.modo_seguridad === 'emergency',
+    umbral_ms:      config?.umbral_apagado_ms    || 5000,
+    distancia_cm:   config?.radio_proximidad_cm  || 300,
+    alertas:        config?.alertas_movimiento   ?? true,
+  });
+});
 
 const PRECIO_PLAN = 29.90;
 const NOMBRE_PLAN = 'Plan MOTOGUARD';

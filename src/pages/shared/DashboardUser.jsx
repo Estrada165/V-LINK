@@ -4,7 +4,7 @@ import AnimatedRing from '../../components/ring/AnimatedRing';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 import TarjetaPlan from '../../components/ui/TarjetaPlan';
 import { useAuth } from '../../context/AuthContext';
-import { vehicleService, alertService, routeService, ticketService, planService } from '../../services/api';
+import api, { vehicleService, alertService, routeService, ticketService, planService } from '../../services/api';
 import { fmtDateTime } from '../../utils/dateUtils';
 
 const Card = ({ children, style = {}, onClick }) => (
@@ -112,7 +112,7 @@ function ModalReportarProblema({ vehiculos, onClose, onCreado }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.1em' }}>TIPO DE PROBLEMA</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {Object.entries(ETIQUETAS_TIPO).map(([key, label]) => {
                 const activo = form.tipo === key;
                 return (
@@ -173,22 +173,25 @@ export default function DashboardUser() {
   const [mostrarTicket,  setMostrarTicket]  = useState(false);
   const [ticketEnviado,  setTicketEnviado]  = useState(false);
   const [estadoPlan,     setEstadoPlan]     = useState(null);
+  const [dispositivo,    setDispositivo]    = useState(null);
 
   useEffect(() => {
     const cargarDatos = async () => {
       setCargando(true);
       try {
-        const [vehs, alts, rts, plan] = await Promise.all([
+        const [vehs, alts, rts, plan, dispositivo] = await Promise.all([
           vehicleService.getAll(),
           alertService.getAll(),
           routeService.getAll(),
           planService.estado().catch(() => null),
+          api.get('/devices/estado').then(r => r.data).catch(() => null),
         ]);
         setVehiculos(vehs);
         if (vehs.length > 0) setVehiculoActivo(vehs[0]);
         setAlertas(alts.slice(0, 4));
         setRutas(rts.slice(0, 3));
         setEstadoPlan(plan);
+        setDispositivo(dispositivo);
       } catch (e) { console.error(e); }
       setCargando(false);
     };
@@ -229,7 +232,7 @@ export default function DashboardUser() {
   );
 
   return (
-    <div style={{ padding: '20px 16px 40px' }} className="anim-fade">
+    <div style={{ padding: '24px 28px' }} className="anim-fade">
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
@@ -307,16 +310,30 @@ export default function DashboardUser() {
             <AnimatedRing status={ringStatus} size={210} />
             {vehiculoActivo && (
               <div style={{ width: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>DISPOSITIVO BLE</span>
-                  <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-muted)' }}>Pendiente vinculación</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: dispositivo?.conectado ? 'var(--green)' : 'var(--text-faint)', boxShadow: dispositivo?.conectado ? '0 0 5px var(--green)' : 'none', transition: 'all .3s' }} />
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: dispositivo?.conectado ? 'var(--green)' : 'var(--text-muted)' }}>
+                      {dispositivo?.conectado ? 'CONECTADO' : dispositivo ? 'SIN SEÑAL' : 'Pendiente vinculación'}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ height: 3, borderRadius: 2, background: 'var(--border)' }} />
+                {dispositivo?.conectado && dispositivo?.ultimo_ping && (
+                  <p style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)', marginBottom: 6 }}>
+                    Última señal: {new Date(dispositivo.ultimo_ping).toLocaleTimeString('es-PE', { timeZone: 'America/Lima' })}
+                    {dispositivo?.bateria_pct != null && ` · Batería ${dispositivo.bateria_pct}%`}
+                  </p>
+                )}
+                <div style={{ height: 3, borderRadius: 2, background: dispositivo?.conectado ? 'var(--green-soft)' : 'var(--border)', overflow: 'hidden' }}>
+                  {dispositivo?.conectado && <div className="anim-blink" style={{ height: '100%', width: '100%', background: 'var(--green)', borderRadius: 2, opacity: 0.6 }} />}
+                </div>
               </div>
             )}
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>            {[
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[
               { label: 'VER EN MAPA', path: '/map',      color: 'var(--cyan)'           },
               { label: 'MIS RUTAS',   path: '/routes',   color: 'var(--text-secondary)' },
               { label: 'AJUSTES',     path: '/settings', color: 'var(--amber)'          },
