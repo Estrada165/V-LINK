@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import axios from 'axios';
 import { alertService, heatmapService, vehicleService, planService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -205,18 +206,18 @@ function ModalReporte({ latlng, vehiculoId, onConfirmar, onCancelar }) {
   );
 }
 
-const BotonMapa = ({ activo, onClick, children }) => (
+const ButtonMap = ({ activo, onClick, children }) => (
   <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 9px', background: activo ? 'var(--accent-soft)' : 'var(--nav-bg)', backdropFilter: 'blur(12px)', border: `1px solid ${activo ? 'var(--accent-border)' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', color: activo ? 'var(--accent)' : 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: 7, letterSpacing: '0.06em', transition: 'all .2s', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
     {children}
   </button>
 );
 
 const FILTROS_TIEMPO = [
-  { key: 'today',   label: 'HOY',       dias: 1    },
-  { key: 'week',    label: 'SEMANA',    dias: 7    },
-  { key: 'month',   label: 'MES',       dias: 30   },
-  { key: 'quarter', label: 'TRIMESTRE', dias: 90   },
-  { key: 'all',     label: 'TODO',      dias: 9999 },
+  { key: 'today',    label: 'HOY',       dias: 1    },
+  { key: 'week',     label: 'SEMANA',    dias: 7    },
+  { key: 'month',    label: 'MES',       dias: 30   },
+  { key: 'quarter',  label: 'TRIMESTRE', dias: 90   },
+  { key: 'all',      label: 'TODO',      dias: 9999 },
 ];
 
 export default function MapPage() {
@@ -255,6 +256,7 @@ export default function MapPage() {
 
   const watchRef = useRef(null);
   const CENTRO_DEFAULT = [-5.1945, -80.6328];
+  const MAC_SIMULADA = "00:11:22:33:44:55";
 
   useEffect(() => {
     const actualizar = () => setEsDesktop(window.innerWidth >= 768);
@@ -310,19 +312,54 @@ export default function MapPage() {
   useEffect(() => { cargarDatos(); solicitarUbicacion(); }, [cargarDatos, solicitarUbicacion]);
 
   useEffect(() => {
+    let intervaloGPS = null;
+
+    const ejecutarTransmisionReal = () => {
+      if (!navigator.geolocation) return;
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setUbicacion(loc);
+          obtenerCiudad(loc.lat, loc.lng);
+
+          try {
+            await axios.post('https://v-link-production-65ce.up.railway.app/api/devices/telemetria', {
+              mac: MAC_SIMULADA,
+              latitud: pos.coords.latitude,
+              longitud: pos.coords.longitude,
+              velocidad: pos.coords.speed || 0
+            });
+          } catch (err) {
+            console.error(err);
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true }
+      );
+    };
+
     if (seguimiento) {
+      ejecutarTransmisionReal();
+      intervaloGPS = setInterval(ejecutarTransmisionReal, 5000);
+      
       watchRef.current = navigator.geolocation?.watchPosition(
         (pos) => {
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setUbicacion(loc); setVolarA([loc.lat, loc.lng]); obtenerCiudad(loc.lat, loc.lng);
+          setVolarA([loc.lat, loc.lng]);
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 5000 }
       );
     } else {
       if (watchRef.current !== null) { navigator.geolocation?.clearWatch(watchRef.current); watchRef.current = null; }
+      if (intervaloGPS) clearInterval(intervaloGPS);
     }
-    return () => { if (watchRef.current !== null) navigator.geolocation?.clearWatch(watchRef.current); };
+
+    return () => {
+      if (watchRef.current !== null) navigator.geolocation?.clearWatch(watchRef.current);
+      if (intervaloGPS) clearInterval(intervaloGPS);
+    };
   }, [seguimiento]);
 
   const confirmarEliminar = async () => {
@@ -379,24 +416,24 @@ export default function MapPage() {
         )}
 
         <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 5, maxWidth: 140 }}>
-          <BotonMapa activo={seguimiento} onClick={() => setSeguimiento(s => !s)}>
+          <ButtonMap activo={seguimiento} onClick={() => setSeguimiento(s => !s)}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
             {seguimiento ? 'ACTIVO' : 'SEGUIMIENTO'}
-          </BotonMapa>
-          <BotonMapa activo={mostrarCalor} onClick={() => setMostrarCalor(h => !h)}>
+          </ButtonMap>
+          <ButtonMap activo={mostrarCalor} onClick={() => setMostrarCalor(h => !h)}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/></svg>
             {mostrarCalor ? 'CALOR ON' : 'CALOR OFF'}
-          </BotonMapa>
+          </ButtonMap>
           {puedeReportar && (
-            <BotonMapa activo={modoReporte} onClick={() => setModoReporte(r => !r)}>
+            <ButtonMap activo={modoReporte} onClick={() => setModoReporte(r => !r)}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               {modoReporte ? 'CLIC EN MAPA' : 'REPORTAR'}
-            </BotonMapa>
+            </ButtonMap>
           )}
-          <BotonMapa activo={false} onClick={() => { if (ubicacion) setVolarA([ubicacion.lat, ubicacion.lng]); else solicitarUbicacion(); }}>
+          <ButtonMap activo={false} onClick={() => { if (ubicacion) setVolarA([ubicacion.lat, ubicacion.lng]); else solicitarUbicacion(); }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
             MI UBICACIÓN
-          </BotonMapa>
+          </ButtonMap>
         </div>
 
         <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
@@ -427,7 +464,7 @@ export default function MapPage() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between' }}>
               <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: colorPorTipo(seleccionada.tipo_incidencia), background: `${colorPorTipo(seleccionada.tipo_incidencia)}15`, border: `1px solid ${colorPorTipo(seleccionada.tipo_incidencia)}30`, padding: '2px 7px', borderRadius: 4 }}>REPORTADO</span>
               {currentUser?.rol === 'admin' && (
                 <button onClick={() => setModalEliminar(seleccionada.id_alerta)} style={{ padding: '4px 10px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', borderRadius: 6, cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--accent)' }}>ELIMINAR</button>
@@ -453,7 +490,7 @@ export default function MapPage() {
       <div style={{ width: esDesktop ? 280 : '100%', height: esDesktop ? '100%' : '45vh', flexShrink: 0, background: 'var(--bg-surface)', borderLeft: esDesktop ? '1px solid var(--border)' : 'none', borderTop: esDesktop ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               <div>
@@ -477,7 +514,7 @@ export default function MapPage() {
           </div>
         </div>
 
-        <div style={{ padding: '8px 14px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ padding: '8px 14px 4px', display: 'flex', justifycontent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>INCIDENCIAS</span>
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: 'var(--text-faint)' }}>{incidencias.length} reporte{incidencias.length !== 1 ? 's' : ''}</span>
         </div>
