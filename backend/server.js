@@ -1105,25 +1105,21 @@ app.get('/api/devices/estado', requireAuth, async (req, res) => {
 
   const { data: disp } = await supabase
     .from('dispositivo_iot')
-    .select('mac_address, estado, ultimo_ping, bateria_pct')
+    .select('id_dispositivo, id_vehiculo, tipo_dispositivo, nivel_bateria, estado_conexion')
     .in('id_vehiculo', ids)
-    .order('ultimo_ping', { ascending: false })
+    .eq('estado_conexion', 'conectado')
     .limit(1)
     .single();
 
   if (!disp) return res.json(null);
 
-  const ahora      = new Date();
-  const ultimoPing = disp.ultimo_ping ? new Date(disp.ultimo_ping) : null;
-  const segsDesde  = ultimoPing ? Math.floor((ahora - ultimoPing) / 1000) : null;
-  const conectado  = segsDesde !== null && segsDesde < 15;
-
   res.json({
-    mac_address: disp.mac_address,
-    conectado,
-    ultimo_ping: disp.ultimo_ping,
-    bateria_pct: disp.bateria_pct,
-    segs_desde:  segsDesde,
+    id_dispositivo: disp.id_dispositivo,
+    id_vehiculo:    disp.id_vehiculo,
+    tipo:           disp.tipo_dispositivo,
+    conectado:      disp.estado_conexion === 'conectado',
+    bateria_pct:    disp.nivel_bateria,
+    ultimo_ping:    new Date().toISOString(),
   });
 });
 
